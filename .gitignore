@@ -1,0 +1,29 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+*.Ruserdata
+
+# Package build artefacts
+/NowcastPulse.Rcheck/
+NowcastPulse_*.tar.gz
+NowcastPulse_*.zip
+
+# devtools / roxygen
+/docs/
+/Meta/
+/man/*.Rd~
+NAMESPACE~
+
+# vignettes
+/vignettes/*.html
+/vignettes/*.pdf
+/vignettes/figure/
+
+# Tests
+/tests/testthat/_snaps/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,40 @@
+Package: NowcastPulse
+Type: Package
+Title: A Comprehensive Nowcasting Framework for Economic Indicators
+Version: 0.1.0
+Authors@R: c(
+    person("NowcastPulse Advisory Group", role = c("aut", "cre"),
+           email = "contact@nowcastpulse.com")
+  )
+Description: Provides a full nowcasting pipeline including data transformation,
+    variable selection, multiple modelling approaches (Bridge, PCA, 3PRF, DFM,
+    Elastic Net, XGBoost, Random Forest), out-of-sample evaluation, and
+    reporting utilities. Designed for mixed-frequency macroeconomic data.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.1.0)
+Imports:
+    seasonal,
+    forecast,
+    dplyr,
+    tidyr,
+    stats,
+    grDevices,
+    ggplot2,
+    openxlsx,
+    KFAS,
+    glmnet,
+    xgboost,
+    randomForest
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    webshot2,
+    shapviz,
+    fastshap
+VignetteBuilder: knitr
+Config/testthat/edition: 3

@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>NowcastPulse: Function Reference and User Guide</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">NowcastPulse: Function Reference and User
+Guide</h1>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#overview" id="toc-overview">Overview</a></li>
+<li><a href="#data-format-requirements" id="toc-data-format-requirements">Data Format Requirements</a>
+<ul>
+<li><a href="#folder-structure" id="toc-folder-structure">Folder
+Structure</a></li>
+<li><a href="#csv-layout-data-files" id="toc-csv-layout-data-files">CSV
+Layout (Data Files)</a></li>
+<li><a href="#date-header-formats-by-frequency" id="toc-date-header-formats-by-frequency">Date Header Formats by
+Frequency</a></li>
+<li><a href="#index-file-prefix_index.csv" id="toc-index-file-prefix_index.csv">Index File
+(<code>&lt;prefix&gt;_Index.csv</code>)</a></li>
+</ul></li>
+<li><a href="#function-reference" id="toc-function-reference">Function
+Reference</a>
+<ul>
+<li><a href="#np_load_data" id="toc-np_load_data"><code>np_load_data()</code></a>
+<ul>
+<li><a href="#purpose" id="toc-purpose">Purpose</a></li>
+<li><a href="#signature" id="toc-signature">Signature</a></li>
+<li><a href="#parameters" id="toc-parameters">Parameters</a></li>
+<li><a href="#return-value" id="toc-return-value">Return Value</a></li>
+<li><a href="#example" id="toc-example">Example</a></li>
+</ul></li>
+<li><a href="#np_seasonal_adjust" id="toc-np_seasonal_adjust"><code>np_seasonal_adjust()</code></a>
+<ul>
+<li><a href="#purpose-1" id="toc-purpose-1">Purpose</a></li>
+<li><a href="#signature-1" id="toc-signature-1">Signature</a></li>
+<li><a href="#parameters-1" id="toc-parameters-1">Parameters</a></li>
+<li><a href="#return-value-1" id="toc-return-value-1">Return
+Value</a></li>
+<li><a href="#example-1" id="toc-example-1">Example</a></li>
+</ul></li>
+<li><a href="#np_aggregate_monthly" id="toc-np_aggregate_monthly"><code>np_aggregate_monthly()</code></a>
+<ul>
+<li><a href="#purpose-2" id="toc-purpose-2">Purpose</a></li>
+<li><a href="#aggregation-methods" id="toc-aggregation-methods">Aggregation methods</a></li>
+<li><a href="#signature-2" id="toc-signature-2">Signature</a></li>
+<li><a href="#parameters-2" id="toc-parameters-2">Parameters</a></li>
+<li><a href="#return-value-2" id="toc-return-value-2">Return
+Value</a></li>
+<li><a href="#example-2" id="toc-example-2">Example</a></li>
+</ul></li>
+<li><a href="#np_merge_monthly" id="toc-np_merge_monthly"><code>np_merge_monthly()</code></a>
+<ul>
+<li><a href="#purpose-3" id="toc-purpose-3">Purpose</a></li>
+<li><a href="#signature-3" id="toc-signature-3">Signature</a></li>
+<li><a href="#parameters-3" id="toc-parameters-3">Parameters</a></li>
+<li><a href="#return-value-3" id="toc-return-value-3">Return
+Value</a></li>
+<li><a href="#example-3" id="toc-example-3">Example</a></li>
+</ul></li>
+<li><a href="#np_process_data-full-pipeline-wrapper" id="toc-np_process_data-full-pipeline-wrapper"><code>np_process_data()</code>
+<em>(full pipeline wrapper)</em></a>
+<ul>
+<li><a href="#purpose-4" id="toc-purpose-4">Purpose</a></li>
+<li><a href="#signature-4" id="toc-signature-4">Signature</a></li>
+<li><a href="#parameters-4" id="toc-parameters-4">Parameters</a></li>
+<li><a href="#output-files-saved-when-save_outputs-true" id="toc-output-files-saved-when-save_outputs-true">Output Files Saved
+(when <code>save_outputs = TRUE</code>)</a></li>
+<li><a href="#return-value-4" id="toc-return-value-4">Return
+Value</a></li>
+<li><a href="#example-4" id="toc-example-4">Example</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#typical-workflow" id="toc-typical-workflow">Typical
+Workflow</a></li>
+<li><a href="#internal-helpers-not-exported" id="toc-internal-helpers-not-exported">Internal Helpers (not
+exported)</a></li>
+<li><a href="#session-info" id="toc-session-info">Session Info</a></li>
+</ul>
+</div>
+
+<hr />
+<div id="overview" class="section level1">
+<h1>Overview</h1>
+<p><strong>NowcastPulse</strong> is a complete nowcasting framework for
+mixed-frequency macroeconomic data. It covers every stage of the
+nowcasting pipeline:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Module</th>
+<th>Functions</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1. Data ingestion</td>
+<td>Data Loading</td>
+<td><code>np_load_data()</code></td>
+</tr>
+<tr class="even">
+<td>2. Seasonal adjustment</td>
+<td>Data Processing</td>
+<td><code>np_seasonal_adjust()</code></td>
+</tr>
+<tr class="odd">
+<td>3. Temporal aggregation</td>
+<td>Data Processing</td>
+<td><code>np_aggregate_monthly()</code></td>
+</tr>
+<tr class="even">
+<td>4. Dataset merging</td>
+<td>Data Processing</td>
+<td><code>np_merge_monthly()</code></td>
+</tr>
+<tr class="odd">
+<td>5. Full pipeline shortcut</td>
+<td>Data Processing</td>
+<td><code>np_process_data()</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Variable selection, modelling, evaluation, and reporting
+modules are added in subsequent releases.</strong></p>
+</blockquote>
+<hr />
+</div>
+<div id="data-format-requirements" class="section level1">
+<h1>Data Format Requirements</h1>
+<p>Before calling any function, your raw data must be organised as
+follows.</p>
+<div id="folder-structure" class="section level2">
+<h2>Folder Structure</h2>
+<pre><code>&lt;data_dir&gt;/
+├── Raw/
+│   ├── &lt;prefix&gt;_Daily_Data.csv
+│   ├── &lt;prefix&gt;_Daily_Data_Oil.csv
+│   ├── &lt;prefix&gt;_Weekly_Data.csv
+│   ├── &lt;prefix&gt;_Monthly_Data.csv
+│   ├── &lt;prefix&gt;_Quarterly_Data.csv
+│   └── &lt;prefix&gt;_Index.csv
+└── Processed/          ← created automatically if save_outputs = TRUE</code></pre>
+</div>
+<div id="csv-layout-data-files" class="section level2">
+<h2>CSV Layout (Data Files)</h2>
+<p>Each data CSV uses a <strong>wide format</strong> (variables as rows,
+dates as columns):</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column position</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1st column</td>
+<td><code>variable_names</code> — short machine-readable identifier</td>
+</tr>
+<tr class="even">
+<td>2nd column</td>
+<td><code>descriptions</code> — human-readable label (ignored by
+package)</td>
+</tr>
+<tr class="odd">
+<td>3rd column onward</td>
+<td>Date labels as column headers; cell values are numeric</td>
+</tr>
+</tbody>
+</table>
+<p>Missing values must be coded as blank cells or <code>#N/A</code>.</p>
+</div>
+<div id="date-header-formats-by-frequency" class="section level2">
+<h2>Date Header Formats by Frequency</h2>
+<table>
+<thead>
+<tr class="header">
+<th>File</th>
+<th>Date format in column headers</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Daily</td>
+<td><code>YYYYMMDD</code></td>
+<td><code>20000103</code></td>
+</tr>
+<tr class="even">
+<td>Daily Oil</td>
+<td><code>M/D/YYYY</code></td>
+<td><code>1/3/2000</code></td>
+</tr>
+<tr class="odd">
+<td>Weekly</td>
+<td><code>M/YY/CCYY</code> (month / 2-digit year)</td>
+<td><code>1/00/2000</code></td>
+</tr>
+<tr class="even">
+<td>Monthly</td>
+<td><code>YYYYMM</code></td>
+<td><code>200001</code></td>
+</tr>
+<tr class="odd">
+<td>Quarterly</td>
+<td><code>YYYYQ</code> (Q = 1–4)</td>
+<td><code>20001</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="index-file-prefix_index.csv" class="section level2">
+<h2>Index File (<code>&lt;prefix&gt;_Index.csv</code>)</h2>
+<p>Controls seasonal adjustment and temporal aggregation behaviour.
+Required columns:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Values</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>variable_names</code></td>
+<td>string</td>
+<td>Must match names in data CSVs</td>
+</tr>
+<tr class="even">
+<td><code>sa_index</code></td>
+<td><code>&quot;NSA&quot;</code> / anything else</td>
+<td><code>&quot;NSA&quot;</code> = apply X-13; otherwise pass through</td>
+</tr>
+<tr class="odd">
+<td><code>agg_index</code></td>
+<td><code>&quot;Sum&quot;</code> / <code>&quot;Average&quot;</code> /
+<code>&quot;Last&quot;</code></td>
+<td>How to collapse sub-monthly obs to monthly</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</div>
+</div>
+<div id="function-reference" class="section level1">
+<h1>Function Reference</h1>
+<hr />
+<div id="np_load_data" class="section level2">
+<h2><code>np_load_data()</code></h2>
+<div id="purpose" class="section level3">
+<h3>Purpose</h3>
+<p>Reads all raw CSV files from <code>&lt;data_dir&gt;/Raw/</code> and
+reshapes each from wide format (variables × dates) to long format (dates
+× variables). Also reads the index file to extract <code>agg_map</code>
+and <code>sa_map</code> control vectors.</p>
+</div>
+<div id="signature" class="section level3">
+<h3>Signature</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">np_load_data</span>(<span class="at">data_dir =</span> <span class="st">&quot;Data/&quot;</span>, <span class="at">prefix =</span> <span class="st">&quot;Fiji&quot;</span>)</span></code></pre></div>
+</div>
+<div id="parameters" class="section level3">
+<h3>Parameters</h3>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>data_dir</code></td>
+<td>character</td>
+<td><code>&quot;Data/&quot;</code></td>
+<td>Root data directory containing a <code>Raw/</code> sub-folder</td>
+</tr>
+<tr class="even">
+<td><code>prefix</code></td>
+<td>character</td>
+<td><code>&quot;Fiji&quot;</code></td>
+<td>File-name prefix, e.g. <code>&quot;Fiji&quot;</code> → reads
+<code>Fiji_Monthly_Data.csv</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="return-value" class="section level3">
+<h3>Return Value</h3>
+<p>A <strong>named list</strong> with 7 elements:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Element</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>$daily</code></td>
+<td>data frame</td>
+<td>Daily series; <code>date</code> col in <code>YYYYMMDD</code>
+format</td>
+</tr>
+<tr class="even">
+<td><code>$daily_oil</code></td>
+<td>data frame</td>
+<td>Daily oil series; <code>date</code> col in <code>M/D/YYYY</code>
+format</td>
+</tr>
+<tr class="odd">
+<td><code>$weekly</code></td>
+<td>data frame</td>
+<td>Weekly series; <code>date</code> col in <code>M/YY/CCYY</code>
+format</td>
+</tr>
+<tr class="even">
+<td><code>$monthly</code></td>
+<td>data frame</td>
+<td>Monthly series; <code>date</code> col in <code>YYYYMM</code>
+format</td>
+</tr>
+<tr class="odd">
+<td><code>$quarterly</code></td>
+<td>data frame</td>
+<td>Quarterly series; <code>date</code> col in <code>YYYYQ</code>
+format</td>
+</tr>
+<tr class="even">
+<td><code>$agg_map</code></td>
+<td>named character vector</td>
+<td><code>variable_name → &quot;Sum&quot; / &quot;Average&quot; / &quot;Last&quot;</code></td>
+</tr>
+<tr class="odd">
+<td><code>$sa_map</code></td>
+<td>named character vector</td>
+<td><code>variable_name → &quot;NSA&quot;</code> or other flag</td>
+</tr>
+</tbody>
+</table>
+<p>All data frames have <code>date</code> as the first column followed
+by one column per variable (numeric). The variable <code>#N/A</code>
+string sentinel is converted to <code>NA</code>.</p>
+</div>
+<div id="example" class="section level3">
+<h3>Example</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(NowcastPulse)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>raw <span class="ot">&lt;-</span> <span class="fu">np_load_data</span>(<span class="at">data_dir =</span> <span class="st">&quot;Data/&quot;</span>, <span class="at">prefix =</span> <span class="st">&quot;Fiji&quot;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">names</span>(raw)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co"># [1] &quot;daily&quot;     &quot;daily_oil&quot; &quot;weekly&quot;    &quot;monthly&quot;   &quot;quarterly&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#     &quot;agg_map&quot;   &quot;sa_map&quot;</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="fu">dim</span>(raw<span class="sc">$</span>monthly)      <span class="co"># e.g. 304 x 42  (months × variables+date)</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>raw<span class="sc">$</span>agg_map[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]      <span class="co"># named vector of aggregation methods</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>raw<span class="sc">$</span>sa_map[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]       <span class="co"># named vector of SA flags</span></span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="np_seasonal_adjust" class="section level2">
+<h2><code>np_seasonal_adjust()</code></h2>
+<div id="purpose-1" class="section level3">
+<h3>Purpose</h3>
+<p>Applies <strong>X-13 ARIMA-SEATS</strong> seasonal adjustment (via
+the <code>seasonal</code> package) to every variable in all five
+frequency data frames. Variables flagged <code>&quot;NSA&quot;</code> in
+<code>sa_map</code> are adjusted; all others are passed through
+unchanged. Every output column is renamed with an <code>_SA</code>
+suffix.</p>
+<p>For non-standard X-13 frequencies (daily <code>freq = 365</code>,
+weekly <code>freq = 52</code>), adjustment is attempted but falls back
+silently to the original series if X-13 fails.</p>
+</div>
+<div id="signature-1" class="section level3">
+<h3>Signature</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">np_seasonal_adjust</span>(raw_data, <span class="at">sa_map =</span> raw_data<span class="sc">$</span>sa_map)</span></code></pre></div>
+</div>
+<div id="parameters-1" class="section level3">
+<h3>Parameters</h3>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>raw_data</code></td>
+<td>named list</td>
+<td>—</td>
+<td>Output of <code>np_load_data()</code></td>
+</tr>
+<tr class="even">
+<td><code>sa_map</code></td>
+<td>named character vector</td>
+<td><code>raw_data$sa_map</code></td>
+<td>SA flags per variable; <code>&quot;NSA&quot;</code> triggers adjustment</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="return-value-1" class="section level3">
+<h3>Return Value</h3>
+<p>A <strong>named list</strong> with 5 elements:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Element</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>$daily</code></td>
+<td>data frame</td>
+<td><code>date</code> + <code>&lt;var&gt;_SA</code> columns at daily
+frequency</td>
+</tr>
+<tr class="even">
+<td><code>$daily_oil</code></td>
+<td>data frame</td>
+<td><code>date</code> + <code>&lt;var&gt;_SA</code> columns at daily
+frequency</td>
+</tr>
+<tr class="odd">
+<td><code>$weekly</code></td>
+<td>data frame</td>
+<td><code>date</code> + <code>&lt;var&gt;_SA</code> columns at weekly
+frequency</td>
+</tr>
+<tr class="even">
+<td><code>$monthly</code></td>
+<td>data frame</td>
+<td><code>date</code> + <code>&lt;var&gt;_SA</code> columns at monthly
+frequency</td>
+</tr>
+<tr class="odd">
+<td><code>$quarterly</code></td>
+<td>data frame</td>
+<td><code>date</code> + <code>&lt;var&gt;_SA</code> columns at quarterly
+frequency</td>
+</tr>
+</tbody>
+</table>
+<p>Original unadjusted columns are dropped; only
+<code>_SA</code>-suffixed columns remain.</p>
+</div>
+<div id="example-1" class="section level3">
+<h3>Example</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>sa <span class="ot">&lt;-</span> <span class="fu">np_seasonal_adjust</span>(raw, <span class="at">sa_map =</span> raw<span class="sc">$</span>sa_map)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">names</span>(sa)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># [1] &quot;daily&quot; &quot;daily_oil&quot; &quot;weekly&quot; &quot;monthly&quot; &quot;quarterly&quot;</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># All columns (except date) end in _SA</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">grep</span>(<span class="st">&quot;_SA$&quot;</span>, <span class="fu">names</span>(sa<span class="sc">$</span>monthly), <span class="at">value =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">3</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co"># [1] &quot;gdp_SA&quot;  &quot;cpi_SA&quot;  &quot;trade_SA&quot;</span></span></code></pre></div>
+<blockquote>
+<p><strong>Note:</strong> X-13 on many variables across daily/weekly
+series can take <strong>5–15 minutes</strong>. Progress is printed
+variable-by-variable.</p>
+</blockquote>
+<hr />
+</div>
+</div>
+<div id="np_aggregate_monthly" class="section level2">
+<h2><code>np_aggregate_monthly()</code></h2>
+<div id="purpose-2" class="section level3">
+<h3>Purpose</h3>
+<p>Converts the daily, daily-oil, and weekly SA data frames to
+<strong>monthly frequency</strong> using the per-variable aggregation
+method from <code>agg_map</code>. The monthly SA data frame is already
+monthly — its <code>date</code> column is standardised from
+<code>&quot;YYYYMM&quot;</code> to <code>&quot;YYYY-MM&quot;</code> and returned as-is.
+Quarterly data is excluded from this step (not merged into the monthly
+file).</p>
+</div>
+<div id="aggregation-methods" class="section level3">
+<h3>Aggregation methods</h3>
+<table>
+<thead>
+<tr class="header">
+<th><code>agg_map</code> value</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;Sum&quot;</code></td>
+<td>Sum of all non-NA observations in the month</td>
+</tr>
+<tr class="even">
+<td><code>&quot;Average&quot;</code></td>
+<td>Mean of all non-NA observations in the month</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;Last&quot;</code></td>
+<td>Last non-NA observation in the month</td>
+</tr>
+<tr class="even">
+<td><em>(not in map)</em></td>
+<td>Defaults to <code>&quot;Average&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>An all-NA month produces <code>NA</code> regardless of method.</p>
+</div>
+<div id="signature-2" class="section level3">
+<h3>Signature</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">np_aggregate_monthly</span>(sa_data, <span class="at">agg_map =</span> <span class="cn">NULL</span>)</span></code></pre></div>
+</div>
+<div id="parameters-2" class="section level3">
+<h3>Parameters</h3>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sa_data</code></td>
+<td>named list</td>
+<td>—</td>
+<td>Output of <code>np_seasonal_adjust()</code></td>
+</tr>
+<tr class="even">
+<td><code>agg_map</code></td>
+<td>named character vector</td>
+<td><code>NULL</code> (→ all Average)</td>
+<td>Aggregation method per variable; typically
+<code>raw$agg_map</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="return-value-2" class="section level3">
+<h3>Return Value</h3>
+<p>A <strong>named list</strong> with 4 elements (quarterly
+excluded):</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Element</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>$daily</code></td>
+<td>data frame</td>
+<td>Daily SA series aggregated to monthly; <code>date</code> =
+<code>&quot;YYYY-MM&quot;</code></td>
+</tr>
+<tr class="even">
+<td><code>$daily_oil</code></td>
+<td>data frame</td>
+<td>Daily oil SA series aggregated to monthly</td>
+</tr>
+<tr class="odd">
+<td><code>$weekly</code></td>
+<td>data frame</td>
+<td>Weekly SA series aggregated to monthly</td>
+</tr>
+<tr class="even">
+<td><code>$monthly</code></td>
+<td>data frame</td>
+<td>Monthly SA series with <code>date</code> standardised to
+<code>&quot;YYYY-MM&quot;</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="example-2" class="section level3">
+<h3>Example</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>monthly_list <span class="ot">&lt;-</span> <span class="fu">np_aggregate_monthly</span>(sa, <span class="at">agg_map =</span> raw<span class="sc">$</span>agg_map)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">names</span>(monthly_list)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># [1] &quot;daily&quot;  &quot;daily_oil&quot;  &quot;weekly&quot;  &quot;monthly&quot;</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">head</span>(monthly_list<span class="sc">$</span>daily<span class="sc">$</span>date, <span class="dv">3</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co"># [1] &quot;2000-01&quot; &quot;2000-02&quot; &quot;2000-03&quot;</span></span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="np_merge_monthly" class="section level2">
+<h2><code>np_merge_monthly()</code></h2>
+<div id="purpose-3" class="section level3">
+<h3>Purpose</h3>
+<p>Merges the four monthly data frames from
+<code>np_aggregate_monthly()</code> into a <strong>single combined data
+frame</strong> via a full outer join on <code>date</code>. Rows before
+<code>start_date</code> are dropped and the result is sorted
+chronologically.</p>
+<p>This combined data frame is the primary input for all downstream
+variable selection and modelling functions.</p>
+</div>
+<div id="signature-3" class="section level3">
+<h3>Signature</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">np_merge_monthly</span>(monthly_list, <span class="at">start_date =</span> <span class="st">&quot;2000-01&quot;</span>)</span></code></pre></div>
+</div>
+<div id="parameters-3" class="section level3">
+<h3>Parameters</h3>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>monthly_list</code></td>
+<td>named list</td>
+<td>—</td>
+<td>Output of <code>np_aggregate_monthly()</code></td>
+</tr>
+<tr class="even">
+<td><code>start_date</code></td>
+<td>character</td>
+<td><code>&quot;2000-01&quot;</code></td>
+<td>Earliest <code>&quot;YYYY-MM&quot;</code> date to keep</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="return-value-3" class="section level3">
+<h3>Return Value</h3>
+<p>A single <strong>data frame</strong>:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>date</code></td>
+<td>character</td>
+<td><code>&quot;YYYY-MM&quot;</code> strings, one row per calendar month</td>
+</tr>
+<tr class="even">
+<td><code>&lt;var&gt;_SA</code> …</td>
+<td>numeric</td>
+<td>All SA variables from daily, oil, weekly, and monthly sources</td>
+</tr>
+</tbody>
+</table>
+<p>Variables from different frequency sources sit side-by-side. Months
+with no observations for a given source appear as <code>NA</code> in
+that variable’s column.</p>
+</div>
+<div id="example-3" class="section level3">
+<h3>Example</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>combined <span class="ot">&lt;-</span> <span class="fu">np_merge_monthly</span>(monthly_list, <span class="at">start_date =</span> <span class="st">&quot;2000-01&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">dim</span>(combined)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co"># e.g. 304 x 89   (months × total variables across all sources)</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>combined[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>]</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#      date  var1_SA  var2_SA  var3_SA</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co"># 1 2000-01   102.3       NA    0.023</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co"># 2 2000-02   103.1    45.2    0.019</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co"># 3 2000-03   101.8    46.0    0.021</span></span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="np_process_data-full-pipeline-wrapper" class="section level2">
+<h2><code>np_process_data()</code> <em>(full pipeline wrapper)</em></h2>
+<div id="purpose-4" class="section level3">
+<h3>Purpose</h3>
+<p>Runs the <strong>complete data processing pipeline</strong> in a
+single call:</p>
+<pre><code>np_load_data()  →  np_seasonal_adjust()  →  np_aggregate_monthly()  →  np_merge_monthly()</code></pre>
+<p>Optionally saves all intermediate and final outputs as CSV files to
+<code>&lt;data_dir&gt;/Processed/</code>.</p>
+</div>
+<div id="signature-4" class="section level3">
+<h3>Signature</h3>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">np_process_data</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">data_dir     =</span> <span class="st">&quot;Data/&quot;</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">prefix       =</span> <span class="st">&quot;Fiji&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">start_date   =</span> <span class="st">&quot;2000-01&quot;</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">save_outputs =</span> <span class="cn">TRUE</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="parameters-4" class="section level3">
+<h3>Parameters</h3>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>data_dir</code></td>
+<td>character</td>
+<td><code>&quot;Data/&quot;</code></td>
+<td>Root data directory</td>
+</tr>
+<tr class="even">
+<td><code>prefix</code></td>
+<td>character</td>
+<td><code>&quot;Fiji&quot;</code></td>
+<td>File-name prefix</td>
+</tr>
+<tr class="odd">
+<td><code>start_date</code></td>
+<td>character</td>
+<td><code>&quot;2000-01&quot;</code></td>
+<td>Earliest month to retain in the combined output</td>
+</tr>
+<tr class="even">
+<td><code>save_outputs</code></td>
+<td>logical</td>
+<td><code>TRUE</code></td>
+<td>If <code>TRUE</code>, writes all processed CSVs to
+<code>&lt;data_dir&gt;/Processed/</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="output-files-saved-when-save_outputs-true" class="section level3">
+<h3>Output Files Saved (when <code>save_outputs = TRUE</code>)</h3>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&lt;prefix&gt;_Daily_Data_SA.csv</code></td>
+<td>Seasonally adjusted daily data</td>
+</tr>
+<tr class="even">
+<td><code>&lt;prefix&gt;_Daily_Data_Oil_SA.csv</code></td>
+<td>Seasonally adjusted daily oil data</td>
+</tr>
+<tr class="odd">
+<td><code>&lt;prefix&gt;_Weekly_Data_SA.csv</code></td>
+<td>Seasonally adjusted weekly data</td>
+</tr>
+<tr class="even">
+<td><code>&lt;prefix&gt;_Monthly_Data_SA.csv</code></td>
+<td>Seasonally adjusted monthly data</td>
+</tr>
+<tr class="odd">
+<td><code>&lt;prefix&gt;_Quarterly_Data_SA.csv</code></td>
+<td>Seasonally adjusted quarterly data</td>
+</tr>
+<tr class="even">
+<td><code>&lt;prefix&gt;_Combined_Monthly_SA.csv</code></td>
+<td>Final merged monthly dataset</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="return-value-4" class="section level3">
+<h3>Return Value</h3>
+<p>Returned <strong>invisibly</strong> — a named list with 3
+elements:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Element</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>$sa</code></td>
+<td>named list (5 data frames)</td>
+<td>SA data at native frequency for each source</td>
+</tr>
+<tr class="even">
+<td><code>$monthly</code></td>
+<td>named list (4 data frames)</td>
+<td>SA data aggregated to monthly per source</td>
+</tr>
+<tr class="odd">
+<td><code>$combined</code></td>
+<td>data frame</td>
+<td>Final merged monthly dataset (main modelling input)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="example-4" class="section level3">
+<h3>Example</h3>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">library</span>(NowcastPulse)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">np_process_data</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">data_dir     =</span> <span class="st">&quot;Data/&quot;</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">prefix       =</span> <span class="st">&quot;Fiji&quot;</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">start_date   =</span> <span class="st">&quot;2000-01&quot;</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">save_outputs =</span> <span class="cn">TRUE</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co"># Inspect the combined output</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">dim</span>(result<span class="sc">$</span>combined)</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="fu">head</span>(result<span class="sc">$</span>combined[, <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>])</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a><span class="co"># Access intermediate SA results</span></span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="fu">dim</span>(result<span class="sc">$</span>sa<span class="sc">$</span>monthly)</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="fu">dim</span>(result<span class="sc">$</span>sa<span class="sc">$</span>quarterly)</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a></span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a><span class="co"># Access monthly-aggregated pieces</span></span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="fu">names</span>(result<span class="sc">$</span>monthly)</span></code></pre></div>
+<hr />
+</div>
+</div>
+</div>
+<div id="typical-workflow" class="section level1">
+<h1>Typical Workflow</h1>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">library</span>(NowcastPulse)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co"># Option A: one-liner</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">np_process_data</span>(<span class="st">&quot;Data/&quot;</span>, <span class="at">prefix =</span> <span class="st">&quot;Fiji&quot;</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>combined <span class="ot">&lt;-</span> result<span class="sc">$</span>combined</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co"># Option B: step-by-step (more control)</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>raw          <span class="ot">&lt;-</span> <span class="fu">np_load_data</span>(<span class="st">&quot;Data/&quot;</span>, <span class="at">prefix =</span> <span class="st">&quot;Fiji&quot;</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>sa           <span class="ot">&lt;-</span> <span class="fu">np_seasonal_adjust</span>(raw, <span class="at">sa_map =</span> raw<span class="sc">$</span>sa_map)</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>monthly_list <span class="ot">&lt;-</span> <span class="fu">np_aggregate_monthly</span>(sa, <span class="at">agg_map =</span> raw<span class="sc">$</span>agg_map)</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>combined     <span class="ot">&lt;-</span> <span class="fu">np_merge_monthly</span>(monthly_list, <span class="at">start_date =</span> <span class="st">&quot;2000-01&quot;</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a><span class="co"># combined is now ready for variable selection and modelling</span></span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a><span class="fu">str</span>(combined[, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>])</span></code></pre></div>
+<hr />
+</div>
+<div id="internal-helpers-not-exported" class="section level1">
+<h1>Internal Helpers (not exported)</h1>
+<p>These functions are used internally and are not part of the public
+API. They can be accessed via <code>NowcastPulse:::</code> for
+debugging.</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>wide_to_long(dta)</code></td>
+<td>Transposes wide CSV format to long (dates × variables)</td>
+</tr>
+<tr class="even">
+<td><code>parse_date_by_type(date_vec, dataset_type)</code></td>
+<td>Converts raw date strings to <code>Date</code> objects by frequency
+type</td>
+</tr>
+<tr class="odd">
+<td><code>adjust_seasonal_align(x, dates, freq)</code></td>
+<td>Runs X-13 on a single series and re-aligns output to original
+length</td>
+</tr>
+<tr class="even">
+<td><code>aggregate_to_monthly_internal(df, dataset_type, agg_map)</code></td>
+<td>Aggregates a data frame to monthly using <code>tapply</code></td>
+</tr>
+<tr class="odd">
+<td><code>apply_x13(df, dataset_type, freq, dataset_label, sa_map)</code></td>
+<td>Applies X-13 to all variables in a data frame</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</div>
+<div id="session-info" class="section level1">
+<h1>Session Info</h1>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

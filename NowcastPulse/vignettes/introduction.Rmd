@@ -1,0 +1,447 @@
+---
+title: "NowcastPulse: Function Reference and User Guide"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{NowcastPulse: Function Reference and User Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE   # examples not run during build; set eval=TRUE for live runs
+)
+```
+
+---
+
+# Overview
+
+**NowcastPulse** is a complete nowcasting framework for mixed-frequency
+macroeconomic data. It covers every stage of the nowcasting pipeline:
+
+| Stage | Module | Functions |
+|---|---|---|
+| 1. Data ingestion | Data Loading | `np_load_data()` |
+| 2. Seasonal adjustment | Data Processing | `np_seasonal_adjust()` |
+| 3. Temporal aggregation | Data Processing | `np_aggregate_monthly()` |
+| 4. Dataset merging | Data Processing | `np_merge_monthly()` |
+| 5. Full pipeline shortcut | Data Processing | `np_process_data()` |
+| 6. Variable transformation | Variable Selection | `np_transform_data()` |
+| 7. Correlation ranking | Variable Selection | `np_rank_correlations()` |
+| 8. Stepwise variable selection | Variable Selection | `np_select_variables()` |
+
+> **Variable selection, modelling, evaluation, and reporting modules are
+> added in subsequent releases.**
+
+---
+
+# Data Format Requirements
+
+Before calling any function, your raw data must be organised as follows.
+
+## Folder Structure
+
+```
+<data_dir>/
+├── Raw/
+│   ├── <prefix>_Daily_Data.csv
+│   ├── <prefix>_Daily_Data_Oil.csv
+│   ├── <prefix>_Weekly_Data.csv
+│   ├── <prefix>_Monthly_Data.csv
+│   ├── <prefix>_Quarterly_Data.csv
+│   └── <prefix>_Index.csv
+└── Processed/          ← created automatically if save_outputs = TRUE
+```
+
+## CSV Layout (Data Files)
+
+Each data CSV uses a **wide format** (variables as rows, dates as columns):
+
+| Column position | Content |
+|---|---|
+| 1st column | `variable_names` — short machine-readable identifier |
+| 2nd column | `descriptions` — human-readable label (ignored by package) |
+| 3rd column onward | Date labels as column headers; cell values are numeric |
+
+Missing values must be coded as blank cells or `#N/A`.
+
+## Date Header Formats by Frequency
+
+| File | Date format in column headers | Example |
+|---|---|---|
+| Daily | `YYYYMMDD` | `20000103` |
+| Daily Oil | `M/D/YYYY` | `1/3/2000` |
+| Weekly | `M/YY/CCYY` (month / 2-digit year) | `1/00/2000` |
+| Monthly | `YYYYMM` | `200001` |
+| Quarterly | `YYYYQ` (Q = 1–4) | `20001` |
+
+## Index File (`<prefix>_Index.csv`)
+
+Controls seasonal adjustment and temporal aggregation behaviour.
+Required columns:
+
+| Column | Values | Meaning |
+|---|---|---|
+| `variable_names` | string | Must match names in data CSVs |
+| `sa_index` | `"NSA"` / anything else | `"NSA"` = apply X-13; otherwise pass through |
+| `agg_index` | `"Sum"` / `"Average"` / `"Last"` | How to collapse sub-monthly obs to monthly |
+
+---
+
+# Function Reference
+
+---
+
+## `np_load_data()`
+
+### Purpose
+
+Reads all raw CSV files from `<data_dir>/Raw/` and reshapes each from wide
+format (variables × dates) to long format (dates × variables). Also reads
+the index file to extract `agg_map` and `sa_map` control vectors.
+
+### Signature
+
+```r
+np_load_data(data_dir = "Data/", prefix = "Fiji")
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `data_dir` | character | `"Data/"` | Root data directory containing a `Raw/` sub-folder |
+| `prefix` | character | `"Fiji"` | File-name prefix, e.g. `"Fiji"` → reads `Fiji_Monthly_Data.csv` |
+
+### Return Value
+
+A **named list** with 7 elements:
+
+| Element | Type | Description |
+|---|---|---|
+| `$daily` | data frame | Daily series; `date` col in `YYYYMMDD` format |
+| `$daily_oil` | data frame | Daily oil series; `date` col in `M/D/YYYY` format |
+| `$weekly` | data frame | Weekly series; `date` col in `M/YY/CCYY` format |
+| `$monthly` | data frame | Monthly series; `date` col in `YYYYMM` format |
+| `$quarterly` | data frame | Quarterly series; `date` col in `YYYYQ` format |
+| `$agg_map` | named character vector | `variable_name → "Sum" / "Average" / "Last"` |
+| `$sa_map` | named character vector | `variable_name → "NSA"` or other flag |
+
+All data frames have `date` as the first column followed by one column per
+variable (numeric). The variable `#N/A` string sentinel is converted to `NA`.
+
+### Example
+
+```{r load}
+library(NowcastPulse)
+
+raw <- np_load_data(data_dir = "Data/", prefix = "Fiji")
+
+names(raw)
+# [1] "daily"     "daily_oil" "weekly"    "monthly"   "quarterly"
+#     "agg_map"   "sa_map"
+
+dim(raw$monthly)      # e.g. 304 x 42  (months × variables+date)
+raw$agg_map[1:3]      # named vector of aggregation methods
+raw$sa_map[1:3]       # named vector of SA flags
+```
+
+---
+
+## `np_seasonal_adjust()`
+
+### Purpose
+
+Applies **X-13 ARIMA-SEATS** seasonal adjustment (via the `seasonal`
+package) to every variable in all five frequency data frames. Variables
+flagged `"NSA"` in `sa_map` are adjusted; all others are passed through
+unchanged. Every output column is renamed with an `_SA` suffix.
+
+For non-standard X-13 frequencies (daily `freq = 365`, weekly `freq = 52`),
+adjustment is attempted but falls back silently to the original series if
+X-13 fails.
+
+### Signature
+
+```r
+np_seasonal_adjust(raw_data, sa_map = raw_data$sa_map)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `raw_data` | named list | — | Output of `np_load_data()` |
+| `sa_map` | named character vector | `raw_data$sa_map` | SA flags per variable; `"NSA"` triggers adjustment |
+
+### Return Value
+
+A **named list** with 5 elements:
+
+| Element | Type | Description |
+|---|---|---|
+| `$daily` | data frame | `date` + `<var>_SA` columns at daily frequency |
+| `$daily_oil` | data frame | `date` + `<var>_SA` columns at daily frequency |
+| `$weekly` | data frame | `date` + `<var>_SA` columns at weekly frequency |
+| `$monthly` | data frame | `date` + `<var>_SA` columns at monthly frequency |
+| `$quarterly` | data frame | `date` + `<var>_SA` columns at quarterly frequency |
+
+Original unadjusted columns are dropped; only `_SA`-suffixed columns remain.
+
+### Example
+
+```{r sa}
+sa <- np_seasonal_adjust(raw, sa_map = raw$sa_map)
+
+names(sa)
+# [1] "daily" "daily_oil" "weekly" "monthly" "quarterly"
+
+# All columns (except date) end in _SA
+grep("_SA$", names(sa$monthly), value = TRUE) |> head(3)
+# [1] "gdp_SA"  "cpi_SA"  "trade_SA"
+```
+
+> **Note:** X-13 on many variables across daily/weekly series can take
+> **5–15 minutes**. Progress is printed variable-by-variable.
+
+---
+
+## `np_aggregate_monthly()`
+
+### Purpose
+
+Converts the daily, daily-oil, and weekly SA data frames to **monthly
+frequency** using the per-variable aggregation method from `agg_map`.
+The monthly SA data frame is already monthly — its `date` column is
+standardised from `"YYYYMM"` to `"YYYY-MM"` and returned as-is.
+Quarterly data is excluded from this step (not merged into the monthly file).
+
+### Aggregation methods
+
+| `agg_map` value | Rule |
+|---|---|
+| `"Sum"` | Sum of all non-NA observations in the month |
+| `"Average"` | Mean of all non-NA observations in the month |
+| `"Last"` | Last non-NA observation in the month |
+| *(not in map)* | Defaults to `"Average"` |
+
+An all-NA month produces `NA` regardless of method.
+
+### Signature
+
+```r
+np_aggregate_monthly(sa_data, agg_map = NULL)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `sa_data` | named list | — | Output of `np_seasonal_adjust()` |
+| `agg_map` | named character vector | `NULL` (→ all Average) | Aggregation method per variable; typically `raw$agg_map` |
+
+### Return Value
+
+A **named list** with 4 elements (quarterly excluded):
+
+| Element | Type | Description |
+|---|---|---|
+| `$daily` | data frame | Daily SA series aggregated to monthly; `date` = `"YYYY-MM"` |
+| `$daily_oil` | data frame | Daily oil SA series aggregated to monthly |
+| `$weekly` | data frame | Weekly SA series aggregated to monthly |
+| `$monthly` | data frame | Monthly SA series with `date` standardised to `"YYYY-MM"` |
+
+### Example
+
+```{r agg}
+monthly_list <- np_aggregate_monthly(sa, agg_map = raw$agg_map)
+
+names(monthly_list)
+# [1] "daily"  "daily_oil"  "weekly"  "monthly"
+
+head(monthly_list$daily$date, 3)
+# [1] "2000-01" "2000-02" "2000-03"
+```
+
+---
+
+## `np_merge_monthly()`
+
+### Purpose
+
+Merges the four monthly data frames from `np_aggregate_monthly()` into a
+**single combined data frame** via a full outer join on `date`. Rows before
+`start_date` are dropped and the result is sorted chronologically.
+
+This combined data frame is the primary input for all downstream
+variable selection and modelling functions.
+
+### Signature
+
+```r
+np_merge_monthly(monthly_list, start_date = "2000-01")
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `monthly_list` | named list | — | Output of `np_aggregate_monthly()` |
+| `start_date` | character | `"2000-01"` | Earliest `"YYYY-MM"` date to keep |
+
+### Return Value
+
+A single **data frame**:
+
+| Column | Type | Description |
+|---|---|---|
+| `date` | character | `"YYYY-MM"` strings, one row per calendar month |
+| `<var>_SA` … | numeric | All SA variables from daily, oil, weekly, and monthly sources |
+
+Variables from different frequency sources sit side-by-side. Months with no
+observations for a given source appear as `NA` in that variable's column.
+
+### Example
+
+```{r merge}
+combined <- np_merge_monthly(monthly_list, start_date = "2000-01")
+
+dim(combined)
+# e.g. 304 x 89   (months × total variables across all sources)
+
+combined[1:3, 1:4]
+#      date  var1_SA  var2_SA  var3_SA
+# 1 2000-01   102.3       NA    0.023
+# 2 2000-02   103.1    45.2    0.019
+# 3 2000-03   101.8    46.0    0.021
+```
+
+---
+
+## `np_process_data()` *(full pipeline wrapper)*
+
+### Purpose
+
+Runs the **complete data processing pipeline** in a single call:
+
+```
+np_load_data()  →  np_seasonal_adjust()  →  np_aggregate_monthly()  →  np_merge_monthly()
+```
+
+Optionally saves all intermediate and final outputs as CSV files to
+`<data_dir>/Processed/`.
+
+### Signature
+
+```r
+np_process_data(
+  data_dir     = "Data/",
+  prefix       = "Fiji",
+  start_date   = "2000-01",
+  save_outputs = TRUE
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `data_dir` | character | `"Data/"` | Root data directory |
+| `prefix` | character | `"Fiji"` | File-name prefix |
+| `start_date` | character | `"2000-01"` | Earliest month to retain in the combined output |
+| `save_outputs` | logical | `TRUE` | If `TRUE`, writes all processed CSVs to `<data_dir>/Processed/` |
+
+### Output Files Saved (when `save_outputs = TRUE`)
+
+| File | Contents |
+|---|---|
+| `<prefix>_Daily_Data_SA.csv` | Seasonally adjusted daily data |
+| `<prefix>_Daily_Data_Oil_SA.csv` | Seasonally adjusted daily oil data |
+| `<prefix>_Weekly_Data_SA.csv` | Seasonally adjusted weekly data |
+| `<prefix>_Monthly_Data_SA.csv` | Seasonally adjusted monthly data |
+| `<prefix>_Quarterly_Data_SA.csv` | Seasonally adjusted quarterly data |
+| `<prefix>_Combined_Monthly_SA.csv` | Final merged monthly dataset |
+
+### Return Value
+
+Returned **invisibly** — a named list with 3 elements:
+
+| Element | Type | Description |
+|---|---|---|
+| `$sa` | named list (5 data frames) | SA data at native frequency for each source |
+| `$monthly` | named list (4 data frames) | SA data aggregated to monthly per source |
+| `$combined` | data frame | Final merged monthly dataset (main modelling input) |
+
+### Example
+
+```{r pipeline}
+library(NowcastPulse)
+
+result <- np_process_data(
+  data_dir     = "Data/",
+  prefix       = "Fiji",
+  start_date   = "2000-01",
+  save_outputs = TRUE
+)
+
+# Inspect the combined output
+dim(result$combined)
+head(result$combined[, 1:6])
+
+# Access intermediate SA results
+dim(result$sa$monthly)
+dim(result$sa$quarterly)
+
+# Access monthly-aggregated pieces
+names(result$monthly)
+```
+
+---
+
+# Typical Workflow
+
+```{r workflow}
+library(NowcastPulse)
+
+# Option A: one-liner
+result <- np_process_data("Data/", prefix = "Fiji")
+combined <- result$combined
+
+# Option B: step-by-step (more control)
+raw          <- np_load_data("Data/", prefix = "Fiji")
+sa           <- np_seasonal_adjust(raw, sa_map = raw$sa_map)
+monthly_list <- np_aggregate_monthly(sa, agg_map = raw$agg_map)
+combined     <- np_merge_monthly(monthly_list, start_date = "2000-01")
+
+# combined is now ready for variable selection and modelling
+str(combined[, 1:5])
+```
+
+---
+
+# Internal Helpers (not exported)
+
+These functions are used internally and are not part of the public API.
+They can be accessed via `NowcastPulse:::` for debugging.
+
+| Function | Description |
+|---|---|
+| `wide_to_long(dta)` | Transposes wide CSV format to long (dates × variables) |
+| `parse_date_by_type(date_vec, dataset_type)` | Converts raw date strings to `Date` objects by frequency type |
+| `adjust_seasonal_align(x, dates, freq)` | Runs X-13 on a single series and re-aligns output to original length |
+| `aggregate_to_monthly_internal(df, dataset_type, agg_map)` | Aggregates a data frame to monthly using `tapply` |
+| `apply_x13(df, dataset_type, freq, dataset_label, sa_map)` | Applies X-13 to all variables in a data frame |
+
+---
+
+# Session Info
+
+```{r session}
+sessionInfo()
+```

@@ -1,0 +1,552 @@
+# ============================================================
+# model_elasticnet.R
+# Elastic Net (glmnet) model estimation, nowcasting, and output
+# generation. Alpha/lambda tuned once via cross-validation on
+# the full sample; coefficients re-estimated at each OOS step.
+# ============================================================
+
+
+# ---- Internal: filter candidate RHS vars for one glmnet fit ---------
+# Mirrors the reference vintage scripts' defensive checks: a candidate must
+# be observed in the target row, have enough overlapping history with
+# dep_var, and have non-zero variance in that history (else glmnet's
+# standardize step would divide by zero).
+#' @noRd
+filter_glmnet_rhs <- function(candidates, target_row, train_df, dep_var, min_history = 8L) {
+  in_target <- vapply(candidates, function(v) !is.na(target_row[[v]][1]), logical(1))
+
+  with_history <- vapply(candidates, function(v) {
+    sum(!is.na(train_df[[dep_var]]) & !is.na(train_df[[v]])) >= min_history
+  }, logical(1))
+
+  has_variance <- vapply(candidates, function(v) {
+    valid <- train_df[[v]][!is.na(train_df[[dep_var]]) & !is.na(train_df[[v]])]
+    if (length(valid) < 2) return(FALSE)
+    stats::var(valid, na.rm = TRUE) > 1e-10
+  }, logical(1))
+
+  candidates[in_target & with_history & has_variance]
+}
+
+
+#' Estimate an Elastic Net model and generate nowcasts
+#'
+#' Runs the full Elastic Net pipeline on a transformed dataset: tunes the
+#' \code{alpha} (L1/L2 mixing) and \code{lambda} (regularisation strength)
+#' hyperparameters via \code{k}-fold cross-validation on the full sample
+#' (\code{glmnet::cv.glmnet}), fits a final \code{\link[glmnet]{glmnet}}
+#' model with those hyperparameters, refits an interpretable OLS on the
+#' resulting non-zero-coefficient variables for reporting, applies ARIMA
+#' imputation to fill predictor trailing NAs, generates an expanding-window
+#' OOS nowcast, and saves all outputs.
+#'
+#' Unlike \code{\link{np_model_pca}} / \code{\link{np_model_dfm}} /
+#' \code{\link{np_model_3prf}}, which re-derive their dimensionality
+#' reduction at every OOS step, \code{alpha} and \code{lambda} here are
+#' tuned \emph{once} on the full sample and held fixed across the OOS
+#' window (as in the reference methodology) — re-running a full
+#' cross-validated grid search at every period would be far more
+#' expensive, and regularisation strength is generally more stable than
+#' coefficients across a modest expanding window. Coefficients themselves
+#' are still re-estimated at each OOS step using only data strictly before
+#' the target period, so no future information leaks into a forecast.
+#' Candidate predictors that are missing at the target period, lack
+#' sufficient training history, or have zero variance in that history are
+#' dropped from that period's fit (mirroring the reference vintage
+#' scripts' defensive filtering, which matters more here than for
+#' \code{\link{np_model_bridge}} since \code{candidate_vars} is typically a
+#' much wider, unscreened pool — letting the regularisation itself do the
+#' selection is the point of using Elastic Net.
+#'
+#' @param dta_trans Data frame as returned by \code{\link{np_transform_data}}.
+#'   Must contain a \code{date} column of class \code{Date} and all columns
+#'   named in \code{candidate_vars}.
+#' @param dep_var Character. Dependent variable column name, e.g.
+#'   \code{"im_SA"}.
+#' @param candidate_vars Character vector of predictor column names to feed
+#'   into the Elastic Net (AR lags, dummies, and a wide indicator pool can
+#'   all be combined here — regularisation selects the sparse subset).
+#'   These must already be present in \code{dta_trans}. Names of the form
+#'   \code{X_lagN} whose base \code{X} exists in \code{dta_trans} are
+#'   auto-created. At least two are required.
+#' @param alpha_grid Numeric vector of \code{alpha} values to cross-validate
+#'   over (\code{0} = pure Ridge, \code{1} = pure LASSO). Defaults to
+#'   \code{seq(0, 1, by = 0.1)}.
+#' @param nfolds Integer. Number of cross-validation folds. Defaults to
+#'   \code{10L}.
+#' @param min_history Integer. Minimum number of overlapping non-NA
+#'   observations (with \code{dep_var}) a candidate needs in the training
+#'   window to be eligible for that OOS period's fit. Defaults to \code{8L}.
+#' @param oos_start Date. Start of the OOS nowcast window.
+#' @param oos_end Date. End of the OOS nowcast window (may extend beyond the
+#'   last observed actual, producing true nowcasts).
+#' @param out_dir Character. Directory where output files are written.
+#'   Created if it does not exist. Defaults to \code{NULL} (no files saved).
+#' @param model_label Character. Short label used in chart titles and file
+#'   names. Defaults to \code{"ElasticNet"}.
+#' @param verbose Logical. Print progress messages. Defaults to \code{TRUE}.
+#'
+#' @return Invisibly, a named list with elements:
+#' \describe{
+#'   \item{\code{full_fit_glmnet}}{The final \code{glmnet} object fit on all
+#'     available observations with the tuned \code{alpha}/\code{lambda}.}
+#'   \item{\code{full_fit}}{An \code{lm} object refit on the non-zero
+#'     coefficient variables, for reporting (t-stats, R²). \code{NULL} if
+#'     regularisation zeroed every coefficient.}
+#'   \item{\code{optimal_alpha}, \code{optimal_lambda}}{The tuned
+#'     hyperparameters.}
+#'   \item{\code{coef_df}}{Data frame of non-zero coefficients from
+#'     \code{full_fit_glmnet}, sorted by \eqn{|coefficient|} descending.}
+#'   \item{\code{nowcast_tbl}}{Data frame combining in-sample fitted values
+#'     and OOS expanding-window nowcasts. Columns: \code{date},
+#'     \code{actual}, \code{nowcast}, \code{type} (\code{"In-sample"} or
+#'     \code{"OOS"}).}
+#'   \item{\code{oos_preds}}{Data frame of OOS predictions only, with columns
+#'     \code{date}, \code{actual}, \code{predicted}.}
+#'   \item{\code{dta_trans}}{The \code{dta_trans} data frame after ARIMA
+#'     imputation of predictor trailing NAs.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' result <- np_baseline_selection(
+#'   data_dir  = "Data/", prefix = "Fiji", dep_var = "im_SA",
+#'   oos_start = as.Date("2020-01-01"), oos_end = as.Date("2025-12-01")
+#' )
+#'
+#' dta_trans <- result$dta_trans
+#'
+#' enet_out <- np_model_elasticnet(
+#'   dta_trans      = dta_trans,
+#'   dep_var        = "im_SA",
+#'   candidate_vars = c("im_SA_lag1", "im_SA_lag12", "crisis_dummy",
+#'                      "cpi_SA", "iip_SA", "petrol_SA", "money_supply_SA"),
+#'   oos_start      = as.Date("2024-01-01"),
+#'   oos_end        = as.Date("2026-04-01"),
+#'   out_dir        = "Outputs/ElasticNet",
+#'   model_label    = "Baseline"
+#' )
+#' enet_out$coef_df
+#' }
+#'
+#' @export
+np_model_elasticnet <- function(dta_trans,
+                                dep_var,
+                                candidate_vars,
+                                alpha_grid  = seq(0, 1, by = 0.1),
+                                nfolds      = 10L,
+                                min_history = 8L,
+                                oos_start,
+                                oos_end,
+                                out_dir     = NULL,
+                                model_label = "ElasticNet",
+                                verbose     = TRUE) {
+
+  oos_start <- as.Date(oos_start)
+  oos_end   <- as.Date(oos_end)
+
+  if (!dep_var %in% names(dta_trans))
+    stop("'", dep_var, "' not found in dta_trans.")
+
+  lag_res        <- auto_create_lags(candidate_vars, dta_trans, verbose = verbose)
+  dta_trans      <- lag_res$dta_trans
+  candidate_vars <- lag_res$vars
+
+  if (length(candidate_vars) < 2)
+    stop("candidate_vars must contain at least 2 variables.")
+
+  if (!is.null(out_dir) && !dir.exists(out_dir))
+    dir.create(out_dir, recursive = TRUE)
+
+  safe_label <- gsub("[^A-Za-z0-9_]", "_", model_label)
+
+  # ---- Step 1: Full-sample hyperparameter tuning + fit ---------------
+
+  if (verbose) message("Step 1: Full-sample Elastic Net tuning (",
+                        length(alpha_grid), " alpha value(s) x ", nfolds, "-fold CV) ...")
+
+  full_train_df <- dta_trans[, c("date", dep_var, candidate_vars), drop = FALSE]
+  full_train_df <- stats::na.omit(full_train_df)
+
+  if (nrow(full_train_df) <= length(candidate_vars) + 1)
+    stop("Insufficient observations for Elastic Net after listwise deletion.")
+
+  X_train <- as.matrix(full_train_df[, candidate_vars, drop = FALSE])
+  y_train <- full_train_df[[dep_var]]
+
+  cv_results <- do.call(rbind, lapply(alpha_grid, function(a) {
+    cv_fit <- tryCatch(
+      glmnet::cv.glmnet(X_train, y_train, alpha = a, nfolds = nfolds,
+                        type.measure = "mse", standardize = TRUE),
+      error = function(e) NULL
+    )
+    if (is.null(cv_fit)) return(NULL)
+    min_idx <- which.min(cv_fit$cvm)
+    data.frame(alpha = a, lambda = cv_fit$lambda[min_idx], cvm = cv_fit$cvm[min_idx])
+  }))
+
+  if (is.null(cv_results) || nrow(cv_results) == 0)
+    stop("Elastic Net cross-validation failed for every alpha in alpha_grid.")
+
+  best <- cv_results[which.min(cv_results$cvm), ]
+  optimal_alpha  <- best$alpha
+  optimal_lambda <- best$lambda
+
+  if (verbose) {
+    message("  Optimal alpha  = ", round(optimal_alpha, 2))
+    message("  Optimal lambda = ", round(optimal_lambda, 5))
+    message("  CV MSE         = ", round(best$cvm, 6))
+  }
+
+  full_fit_glmnet <- glmnet::glmnet(X_train, y_train, alpha = optimal_alpha,
+                                    lambda = optimal_lambda, standardize = TRUE)
+
+  coef_mat <- as.matrix(stats::coef(full_fit_glmnet))
+  coef_df <- data.frame(
+    variable    = rownames(coef_mat),
+    coefficient = as.numeric(coef_mat[, 1]),
+    stringsAsFactors = FALSE
+  )
+  coef_df <- coef_df[coef_df$coefficient != 0, ]
+  coef_df <- coef_df[order(-abs(coef_df$coefficient)), ]
+  rownames(coef_df) <- NULL
+
+  selected_vars <- setdiff(coef_df$variable, "(Intercept)")
+
+  if (verbose) {
+    message("  Non-zero coefficients: ", length(selected_vars), " of ", length(candidate_vars))
+    for (i in seq_len(nrow(coef_df)))
+      message("    ", formatC(coef_df$variable[i], width = 30, flag = "-"),
+              " ", round(coef_df$coefficient[i], 5))
+  }
+
+  # ---- Step 2: Interpretable OLS on the selected (non-zero) variables ----
+
+  full_fit <- NULL
+  if (length(selected_vars) > 0) {
+    ols_fml  <- stats::as.formula(paste(dep_var, "~", paste(selected_vars, collapse = " + ")))
+    full_fit <- stats::lm(ols_fml, data = full_train_df)
+
+    if (verbose) message("  OLS Adj R² (on selected vars) = ",
+                          round(summary(full_fit)$adj.r.squared, 4))
+  } else if (verbose) {
+    message("  All coefficients zeroed by regularisation — regression table skipped.")
+  }
+
+  # ---- Step 3: Save regression table PNG ------------------------------
+
+  if (!is.null(out_dir) && !is.null(full_fit)) {
+    sg_html <- file.path(out_dir, paste0("regression_", safe_label, ".html"))
+    sg_png  <- file.path(out_dir, paste0("regression_", safe_label, ".png"))
+
+    html_content <- make_reg_html(
+      full_fit,
+      title     = paste0("Elastic Net Model — ", model_label, " (", dep_var,
+                         ", α=", round(optimal_alpha, 2),
+                         ", λ=", round(optimal_lambda, 5), ")"),
+      dep_label = dep_var
+    )
+    writeLines(html_content, sg_html)
+
+    if (requireNamespace("webshot2", quietly = TRUE)) {
+      webshot2::webshot(sg_html, sg_png, vwidth = 500, vheight = 600, zoom = 2)
+      file.remove(sg_html)
+      if (verbose) message("  Saved: ", basename(sg_png))
+    } else {
+      if (verbose) message("  Saved: ", basename(sg_html),
+                           "  (install 'webshot2' to also get PNG)")
+    }
+  }
+
+  # ---- Step 4: ARIMA imputation for predictor trailing NAs ---------
+
+  if (verbose) message("Step 2: ARIMA imputation for predictor trailing NAs ...")
+  n_imputed <- 0L
+  for (col in candidate_vars) {
+    if (any(is.na(dta_trans[[col]]))) {
+      dta_trans[[col]] <- arima_impute_col(dta_trans[[col]])
+      n_imputed <- n_imputed + 1L
+    }
+  }
+  if (verbose) message("  Imputed ", n_imputed, " column(s).")
+
+  # ---- Step 5: OOS expanding-window nowcast -------------------------
+  # alpha/lambda are held fixed at their full-sample tuned values (see
+  # function docs); coefficients are re-estimated each period on data
+  # strictly before it, so no future information leaks into a forecast.
+
+  if (verbose) message("Step 3: Generating OOS nowcasts (expanding window) ...")
+
+  oos_months <- dta_trans$date[dta_trans$date >= oos_start &
+                                 dta_trans$date <= oos_end]
+
+  oos_preds <- do.call(rbind, lapply(oos_months, function(t_month) {
+
+    actual <- dta_trans[dta_trans$date == t_month, dep_var, drop = TRUE]
+    actual <- if (length(actual) > 0) actual[1] else NA_real_
+
+    na_row <- function() data.frame(date = t_month, actual = actual,
+                                    predicted = NA_real_, stringsAsFactors = FALSE)
+
+    target_row <- dta_trans[dta_trans$date == t_month, candidate_vars, drop = FALSE]
+    if (nrow(target_row) == 0) return(na_row())
+
+    train_base <- dta_trans[dta_trans$date < t_month, c(dep_var, candidate_vars), drop = FALSE]
+
+    rhs_vars <- filter_glmnet_rhs(candidate_vars, target_row, train_base, dep_var, min_history)
+
+    if (length(rhs_vars) == 0) {
+      train_df <- stats::na.omit(train_base[, dep_var, drop = FALSE])
+      if (nrow(train_df) < 3) return(na_row())
+      return(data.frame(date = t_month, actual = actual,
+                        predicted = mean(train_df[[dep_var]], na.rm = TRUE),
+                        stringsAsFactors = FALSE))
+    }
+
+    train_df <- stats::na.omit(train_base[, c(dep_var, rhs_vars), drop = FALSE])
+    min_obs  <- max(5, length(rhs_vars) + 2)
+    if (nrow(train_df) < min_obs) return(na_row())
+
+    X_tr <- as.matrix(train_df[, rhs_vars, drop = FALSE])
+    y_tr <- train_df[[dep_var]]
+
+    fit <- tryCatch(
+      glmnet::glmnet(X_tr, y_tr, alpha = optimal_alpha, lambda = optimal_lambda,
+                     standardize = TRUE),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) return(na_row())
+
+    X_new <- as.matrix(target_row[, rhs_vars, drop = FALSE])
+    if (any(is.na(X_new))) return(na_row())
+
+    data.frame(
+      date      = t_month,
+      actual    = actual,
+      predicted = as.numeric(stats::predict(fit, newx = X_new, s = optimal_lambda)),
+      stringsAsFactors = FALSE
+    )
+  }))
+
+  # Restore Date class lost by do.call(rbind) on data frames with Date columns
+  oos_preds$date <- as.Date(oos_preds$date, origin = "1970-01-01")
+
+  # ---- Step 6: Combine in-sample + OOS into nowcast_tbl -------------
+
+  full_train_fitted <- as.numeric(stats::predict(full_fit_glmnet, newx = X_train, s = optimal_lambda))
+
+  insample_df <- data.frame(
+    date    = full_train_df$date,
+    actual  = full_train_df[[dep_var]],
+    nowcast = full_train_fitted,
+    type    = "In-sample",
+    stringsAsFactors = FALSE
+  )
+  oos_df <- data.frame(
+    date    = oos_preds$date,
+    actual  = oos_preds$actual,
+    nowcast = oos_preds$predicted,
+    type    = "OOS",
+    stringsAsFactors = FALSE
+  )
+  nowcast_tbl <- rbind(insample_df, oos_df)
+  # Restore Date class — rbind on mixed data frames can strip it
+  nowcast_tbl$date <- as.Date(nowcast_tbl$date, origin = "1970-01-01")
+  nowcast_tbl <- nowcast_tbl[order(nowcast_tbl$date), ]
+  rownames(nowcast_tbl) <- NULL
+
+  if (verbose) {
+    oos_complete <- oos_preds[!is.na(oos_preds$predicted), ]
+    message("  OOS nowcasts produced: ", nrow(oos_complete), " of ",
+            length(oos_months), " period(s)")
+    message("  Last OOS nowcast:\n",
+            paste(utils::capture.output(
+              print(utils::tail(oos_complete, 3), row.names = FALSE)
+            ), collapse = "\n"))
+  }
+
+  # ---- Step 7: Nowcast chart -----------------------------------------
+
+  if (!is.null(out_dir) && requireNamespace("ggplot2", quietly = TRUE)) {
+    chart_data <- nowcast_tbl[!is.na(nowcast_tbl$nowcast), ]
+    oos_pts    <- oos_preds[!is.na(oos_preds$predicted), ]
+
+    p <- ggplot2::ggplot(chart_data, ggplot2::aes(x = date)) +
+      ggplot2::geom_line(ggplot2::aes(y = actual,  colour = "Actual"),
+                         linewidth = 0.8, na.rm = TRUE) +
+      ggplot2::geom_line(ggplot2::aes(y = nowcast, colour = "Elastic Net",
+                                      linetype = type),
+                         linewidth = 0.8, na.rm = TRUE) +
+      ggplot2::geom_point(data = oos_pts,
+                          ggplot2::aes(y = predicted, colour = "Elastic Net"),
+                          size = 2) +
+      ggplot2::geom_vline(xintercept = as.numeric(oos_start),
+                          linetype = "dotdash", colour = "grey50",
+                          linewidth = 0.6) +
+      ggplot2::geom_hline(yintercept = 0, linetype = "dotted",
+                          colour = "grey60") +
+      ggplot2::scale_colour_manual(
+        values = c("Actual" = "#0C4550", "Elastic Net" = "#457B9D")
+      ) +
+      ggplot2::scale_linetype_manual(
+        values = c("In-sample" = "solid", "OOS" = "dashed"), guide = "none"
+      ) +
+      ggplot2::scale_x_date(date_breaks = "6 months",
+                            date_labels = "%Y-%m") +
+      ggplot2::annotate("text", x = oos_start, y = Inf,
+                        label = paste0("OOS: ", format(oos_start, "%Y-%m")),
+                        hjust = -0.05, vjust = 1.5, size = 3,
+                        colour = "grey40") +
+      ggplot2::labs(
+        title    = paste0(dep_var, " — Elastic Net (", model_label,
+                          "): Actual vs Nowcast"),
+        subtitle = paste0("Solid = in-sample fit  |  Dashed + points = OOS expanding-window\n",
+                          "α=", round(optimal_alpha, 2),
+                          "  λ=", round(optimal_lambda, 5),
+                          "  |  ", length(selected_vars), " of ",
+                          length(candidate_vars), " candidate(s) retained"),
+        x = NULL, y = paste0("Annual Growth Rate (", dep_var, ")"),
+        colour = NULL
+      ) +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(
+        legend.position = "bottom",
+        axis.text.x     = ggplot2::element_text(angle = 45, hjust = 1),
+        plot.subtitle   = ggplot2::element_text(size = 7, colour = "grey50")
+      )
+
+    chart_path <- file.path(out_dir,
+                            paste0("elasticnet_nowcast_chart_", safe_label, ".png"))
+    ggplot2::ggsave(chart_path, p, width = 12, height = 6, dpi = 150)
+    if (verbose) message("  Saved: ", basename(chart_path))
+
+    # ---- OOS-only chart with evaluation metrics -------------------
+    oos_eval <- oos_preds[!is.na(oos_preds$predicted) &
+                            !is.na(oos_preds$actual), ]
+
+    if (nrow(oos_eval) >= 2) {
+      oos_mae  <- mean(abs(oos_eval$predicted - oos_eval$actual))
+      oos_rmse <- sqrt(mean((oos_eval$predicted - oos_eval$actual)^2))
+      metrics_label <- sprintf(
+        "OOS MAE = %.4f  |  RMSE = %.4f  (n = %d evaluated period(s))",
+        oos_mae, oos_rmse, nrow(oos_eval)
+      )
+    } else {
+      oos_mae <- oos_rmse <- NA_real_
+      metrics_label <- "No evaluated OOS periods yet (actuals not yet available)"
+    }
+
+    oos_plot_data      <- oos_preds
+    oos_plot_data$date <- as.Date(oos_plot_data$date, origin = "1970-01-01")
+
+    p_oos <- ggplot2::ggplot(oos_plot_data,
+                             ggplot2::aes(x = date)) +
+      ggplot2::geom_line(ggplot2::aes(y = actual,    colour = "Actual"),
+                         linewidth = 0.9, na.rm = TRUE) +
+      ggplot2::geom_line(ggplot2::aes(y = predicted, colour = "Elastic Net"),
+                         linewidth = 0.9, linetype = "dashed", na.rm = TRUE) +
+      ggplot2::geom_point(ggplot2::aes(y = predicted, colour = "Elastic Net"),
+                          size = 2.5, na.rm = TRUE) +
+      ggplot2::geom_hline(yintercept = 0, linetype = "dotted",
+                          colour = "grey60") +
+      ggplot2::scale_colour_manual(
+        values = c("Actual" = "#0C4550", "Elastic Net" = "#457B9D")
+      ) +
+      ggplot2::scale_x_date(date_breaks = "3 months",
+                            date_labels = "%Y-%m") +
+      ggplot2::labs(
+        title    = paste0(dep_var, " — Elastic Net (",
+                          model_label, "): OOS Evaluation"),
+        subtitle = metrics_label,
+        x = NULL, y = paste0("Annual Growth Rate (", dep_var, ")"),
+        colour = NULL
+      ) +
+        ggplot2::theme_minimal() +
+        ggplot2::theme(
+          legend.position = "bottom",
+          axis.text.x     = ggplot2::element_text(angle = 45, hjust = 1),
+          plot.subtitle   = ggplot2::element_text(size = 9, colour = "grey30",
+                                                  family = "mono")
+        )
+
+    oos_chart_path <- file.path(out_dir,
+                                paste0("elasticnet_oos_eval_", safe_label, ".png"))
+    ggplot2::ggsave(oos_chart_path, p_oos, width = 10, height = 5, dpi = 150)
+    if (verbose) message("  Saved: ", basename(oos_chart_path),
+                         if (!is.na(oos_mae))
+                           paste0("  (MAE=", round(oos_mae, 4),
+                                  ", RMSE=", round(oos_rmse, 4), ")")
+                         else "  (no actuals yet)")
+  }
+
+  # ---- Step 8: Excel export -------------------------------------------
+
+  if (!is.null(out_dir) && requireNamespace("openxlsx", quietly = TRUE)) {
+    wb <- openxlsx::createWorkbook()
+
+    openxlsx::addWorksheet(wb, "Nowcast")
+    openxlsx::writeDataTable(wb, "Nowcast", nowcast_tbl,
+                             tableStyle = "TableStyleMedium9")
+    openxlsx::setColWidths(wb, "Nowcast",
+                           cols = seq_len(ncol(nowcast_tbl)), widths = "auto")
+
+    latest_oos <- oos_preds[!is.na(oos_preds$predicted) &
+                               oos_preds$date == max(oos_preds$date[
+                                 !is.na(oos_preds$predicted)]), ]
+    openxlsx::addWorksheet(wb, "Latest_Nowcast")
+    openxlsx::writeDataTable(wb, "Latest_Nowcast", latest_oos,
+                             tableStyle = "TableStyleMedium2")
+
+    openxlsx::addWorksheet(wb, "Coefficients")
+    openxlsx::writeDataTable(wb, "Coefficients", coef_df,
+                             tableStyle = "TableStyleMedium2")
+
+    openxlsx::addWorksheet(wb, "CV_Results")
+    openxlsx::writeDataTable(wb, "CV_Results", cv_results,
+                             tableStyle = "TableStyleMedium2")
+
+    xl_path <- file.path(out_dir,
+                         paste0("elasticnet_nowcast_", safe_label, ".xlsx"))
+    openxlsx::saveWorkbook(wb, xl_path, overwrite = TRUE)
+    if (verbose) message("  Saved: ", basename(xl_path))
+  }
+
+  # ---- Step 9: Save RDS ------------------------------------------------
+
+  if (!is.null(out_dir)) {
+    rds_path <- file.path(out_dir,
+                          paste0("elasticnet_model_data_", safe_label, ".rds"))
+    saveRDS(
+      list(
+        dta_trans       = dta_trans,
+        candidate_vars  = candidate_vars,
+        dep_var         = dep_var,
+        optimal_alpha   = optimal_alpha,
+        optimal_lambda  = optimal_lambda,
+        cv_results      = cv_results,
+        coef_df         = coef_df,
+        full_fit_glmnet = full_fit_glmnet,
+        full_fit        = full_fit,
+        nowcast_tbl     = nowcast_tbl,
+        oos_preds       = oos_preds,
+        oos_start       = oos_start,
+        oos_end         = oos_end
+      ),
+      file = rds_path
+    )
+    if (verbose) message("  Saved: ", basename(rds_path))
+  }
+
+  if (verbose) message("=== Elastic Net model complete. ===\n")
+
+  invisible(list(
+    full_fit_glmnet = full_fit_glmnet,
+    full_fit        = full_fit,
+    optimal_alpha   = optimal_alpha,
+    optimal_lambda  = optimal_lambda,
+    coef_df         = coef_df,
+    nowcast_tbl     = nowcast_tbl,
+    oos_preds       = oos_preds,
+    dta_trans       = dta_trans
+  ))
+}
