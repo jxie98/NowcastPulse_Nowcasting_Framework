@@ -334,6 +334,90 @@ np_merge_monthly <- function(monthly_list, start_date = "2000-01") {
 }
 
 
+# ---- Exported function: np_interpolate_data --------------------
+
+#' Interpolate missing/zero values in selected series via cubic spline
+#'
+#' Treats \code{0} values as missing (optional) and fills interior
+#' \code{NA} gaps in the specified columns of a combined dataset using
+#' natural cubic spline interpolation (\code{\link[stats]{spline}}).  Only
+#' gaps strictly between the first and last non-missing observation of a
+#' series are filled; leading/trailing missing values are left untouched,
+#' since a spline is not defined outside the observed range.
+#'
+#' @param combined Data frame as returned by \code{\link{np_merge_monthly}}
+#'   or \code{\link{np_aggregate_to_target}} (must contain a \code{date}
+#'   column plus one column per variable).
+#' @param vars Character vector of variable names to interpolate.  Each name
+#'   is matched against \code{combined} column names directly, or (if not
+#'   found) with an \code{"_SA"} suffix appended.  Variables not found in
+#'   either form are skipped with a warning.  Defaults to \code{NULL}
+#'   (no-op).
+#' @param zero_as_na Logical. If \code{TRUE} (default), values of exactly
+#'   \code{0} are treated as missing before interpolating.
+#' @param verbose Logical. If \code{TRUE} (default), a message is printed
+#'   for each interpolated variable.
+#'
+#' @return \code{combined} with the specified columns interpolated.
+#'
+#' @examples
+#' \dontrun{
+#' combined_filled <- np_interpolate_data(
+#'   combined = combined,
+#'   vars     = c("rem_mno_SA", "REER_SA")
+#' )
+#' }
+#'
+#' @export
+np_interpolate_data <- function(combined,
+                                vars       = NULL,
+                                zero_as_na = TRUE,
+                                verbose    = TRUE) {
+
+  if (is.null(vars) || length(vars) == 0) return(combined)
+
+  match_col <- function(v) {
+    if (v %in% names(combined)) return(v)
+    v_sa <- paste0(v, "_SA")
+    if (v_sa %in% names(combined)) return(v_sa)
+    NA_character_
+  }
+
+  resolved  <- vapply(vars, match_col, character(1))
+  missing_v <- vars[is.na(resolved)]
+  if (length(missing_v) > 0)
+    warning("Variable(s) not found for interpolation — skipped: ",
+            paste(missing_v, collapse = ", "), call. = FALSE)
+
+  cols <- unname(resolved[!is.na(resolved)])
+
+  for (col in cols) {
+    x <- as.numeric(combined[[col]])
+    if (zero_as_na) x[x == 0] <- NA_real_
+
+    idx   <- seq_along(x)
+    valid <- !is.na(x)
+
+    if (sum(valid) < 3) {
+      if (verbose) message("  Skipped interpolation (fewer than 3 non-missing points): ", col)
+      combined[[col]] <- x
+      next
+    }
+
+    interior <- min(idx[valid]):max(idx[valid])
+    if (any(is.na(x[interior]))) {
+      fit <- stats::spline(x = idx[valid], y = x[valid], xout = interior, method = "natural")
+      x[interior] <- fit$y
+      if (verbose) message("  Interpolated (cubic spline): ", col)
+    }
+
+    combined[[col]] <- x
+  }
+
+  combined
+}
+
+
 # ---- Exported function: np_aggregate_to_target -----------------
 
 #' Aggregate a combined monthly dataset up to a coarser target frequency

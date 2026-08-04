@@ -801,6 +801,16 @@ np_select_variables <- function(dta_trans,
 #'   accept an ADD or DROP step.  Defaults to \code{0.005}.
 #' @param dummy_vars Character vector of dummy column names to always include
 #'   in the candidate pool.  Defaults to \code{NULL}.
+#' @param interpolate_vars Character vector of variable names to interpolate
+#'   right after the combined dataset is built (see
+#'   \code{\link{np_interpolate_data}}), before transformation. Values of
+#'   \code{0} are first treated as missing (see \code{zero_as_na}), then
+#'   interior \code{NA} gaps are filled via natural cubic spline. Defaults to
+#'   \code{NULL} (no interpolation).
+#' @param zero_as_na Logical. If \code{TRUE} (default), values of exactly
+#'   \code{0} are treated as missing before interpolating
+#'   \code{interpolate_vars}. Ignored if \code{interpolate_vars} is
+#'   \code{NULL}.
 #' @param out_dir Character. If supplied, all output files from
 #'   \code{np_transform_data} and \code{np_select_variables} are written
 #'   here.  Defaults to \code{NULL}.
@@ -844,6 +854,8 @@ np_baseline_selection <- function(data_dir       = "Data/",
                                   corr_threshold = 0.4,
                                   min_improve    = 0.005,
                                   dummy_vars     = NULL,
+                                  interpolate_vars = NULL,
+                                  zero_as_na       = TRUE,
                                   out_dir        = NULL,
                                   save_processed = TRUE,
                                   verbose        = TRUE) {
@@ -855,11 +867,11 @@ np_baseline_selection <- function(data_dir       = "Data/",
 
   # Step 1: Load raw data
   if (verbose) message("=== NowcastPulse: Baseline Selection Pipeline ===")
-  if (verbose) message("Step 1/4: Loading raw data ...")
+  if (verbose) message("Step 1/5: Loading raw data ...")
   raw <- np_load_data(data_dir = data_dir, prefix = prefix)
 
   # Step 2: Process data (SA + aggregate + merge)
-  if (verbose) message("Step 2/4: Processing data (X-13, aggregation, merge) ...")
+  if (verbose) message("Step 2/5: Processing data (X-13, aggregation, merge) ...")
   processed <- np_process_data(
     data_dir     = data_dir,
     prefix       = prefix,
@@ -868,8 +880,19 @@ np_baseline_selection <- function(data_dir       = "Data/",
     save_outputs = save_processed
   )
 
-  # Step 3: Transform
-  if (verbose) message("Step 3/4: Transforming data ...")
+  # Step 3: Interpolate specified variables (treat 0 as NA, cubic spline)
+  if (!is.null(interpolate_vars)) {
+    if (verbose) message("Step 3/5: Interpolating specified variables ...")
+    processed$combined <- np_interpolate_data(
+      combined   = processed$combined,
+      vars       = interpolate_vars,
+      zero_as_na = zero_as_na,
+      verbose    = verbose
+    )
+  }
+
+  # Step 4: Transform
+  if (verbose) message("Step 4/5: Transforming data ...")
   dta_trans <- np_transform_data(
     combined    = processed$combined,
     trans_map   = raw$trans_map,
@@ -879,8 +902,8 @@ np_baseline_selection <- function(data_dir       = "Data/",
     out_dir     = out_dir
   )
 
-  # Step 4: Variable selection
-  if (verbose) message("Step 4/4: Variable selection ...")
+  # Step 5: Variable selection
+  if (verbose) message("Step 5/5: Variable selection ...")
   selection <- np_select_variables(
     dta_trans      = dta_trans,
     dep_var        = dep_var,
