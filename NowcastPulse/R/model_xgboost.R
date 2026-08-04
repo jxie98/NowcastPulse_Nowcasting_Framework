@@ -212,7 +212,10 @@ np_model_xgboost <- function(dta_trans,
 
   set.seed(seed)
 
-  cv_results <- do.call(rbind, lapply(seq_len(nrow(param_grid)), function(i) {
+  n_grid <- nrow(param_grid)
+  grid_t0 <- Sys.time()
+
+  cv_results <- do.call(rbind, lapply(seq_len(n_grid), function(i) {
     params <- list(
       objective         = "reg:squarederror",
       eta               = param_grid$eta[i],
@@ -228,12 +231,30 @@ np_model_xgboost <- function(dta_trans,
       ),
       error = function(e) NULL
     )
-    if (is.null(cv_fit)) return(NULL)
+
+    if (is.null(cv_fit)) {
+      if (verbose)
+        message("  [", i, "/", n_grid, "] eta=", params$eta,
+                " depth=", params$max_depth, " subsample=", params$subsample,
+                " colsample=", params$colsample_bytree, " -> CV failed, skipped")
+      return(NULL)
+    }
 
     best_iter <- if (!is.null(cv_fit$best_iteration) && length(cv_fit$best_iteration) > 0) {
       cv_fit$best_iteration
     } else {
       which.min(cv_fit$evaluation_log$test_rmse_mean)
+    }
+    cv_rmse <- cv_fit$evaluation_log$test_rmse_mean[best_iter]
+
+    # per-combination status so long grid searches are not silent
+    if (verbose) {
+      elapsed <- round(as.numeric(difftime(Sys.time(), grid_t0, units = "secs")), 1)
+      message("  [", i, "/", n_grid, "] eta=", params$eta,
+              " depth=", params$max_depth, " subsample=", params$subsample,
+              " colsample=", params$colsample_bytree,
+              " -> CV RMSE=", round(cv_rmse, 6),
+              " (best_iter=", best_iter, ", elapsed=", elapsed, "s)")
     }
 
     data.frame(
@@ -242,7 +263,7 @@ np_model_xgboost <- function(dta_trans,
       subsample         = param_grid$subsample[i],
       colsample_bytree  = param_grid$colsample_bytree[i],
       best_iteration    = best_iter,
-      cv_rmse           = cv_fit$evaluation_log$test_rmse_mean[best_iter]
+      cv_rmse           = cv_rmse
     )
   }))
 
