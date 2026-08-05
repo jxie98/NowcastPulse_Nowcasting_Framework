@@ -161,9 +161,12 @@ np_model_dfm <- function(dta_trans,
   if (length(dfm_vars) < 2)
     stop("dfm_vars must contain at least 2 variables to extract a common factor.")
 
-  missing_dfm <- setdiff(dfm_vars, names(dta_trans))
+  lag_res_dfm <- auto_create_lags(dfm_vars, dta_trans, verbose = verbose)
+  dta_trans   <- lag_res_dfm$dta_trans
+  missing_dfm <- setdiff(dfm_vars, lag_res_dfm$vars)
   if (length(missing_dfm) > 0)
     stop("dfm_vars not found in dta_trans: ", paste(missing_dfm, collapse = ", "))
+  dfm_vars    <- lag_res_dfm$vars
 
   lag_res     <- auto_create_lags(fixed_vars, dta_trans, verbose = verbose)
   dta_trans   <- lag_res$dta_trans

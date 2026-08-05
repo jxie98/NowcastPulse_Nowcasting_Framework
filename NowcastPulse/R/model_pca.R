@@ -106,9 +106,12 @@ np_model_pca <- function(dta_trans,
   if (!dep_var %in% names(dta_trans))
     stop("'", dep_var, "' not found in dta_trans.")
 
-  missing_pca <- setdiff(pca_vars, names(dta_trans))
+  lag_res_pca <- auto_create_lags(pca_vars, dta_trans, verbose = verbose)
+  dta_trans   <- lag_res_pca$dta_trans
+  missing_pca <- setdiff(pca_vars, lag_res_pca$vars)
   if (length(missing_pca) > 0)
     stop("pca_vars not found in dta_trans: ", paste(missing_pca, collapse = ", "))
+  pca_vars    <- lag_res_pca$vars
 
   lag_res     <- auto_create_lags(fixed_vars, dta_trans, verbose = verbose)
   dta_trans   <- lag_res$dta_trans

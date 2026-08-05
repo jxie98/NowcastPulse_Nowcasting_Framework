@@ -147,9 +147,12 @@ np_model_3prf <- function(dta_trans,
     stop("tprf_vars must contain at least 2 variables for the Pass 2 ",
          "cross-sectional regression.")
 
-  missing_tprf <- setdiff(tprf_vars, names(dta_trans))
+  lag_res_tprf <- auto_create_lags(tprf_vars, dta_trans, verbose = verbose)
+  dta_trans    <- lag_res_tprf$dta_trans
+  missing_tprf <- setdiff(tprf_vars, lag_res_tprf$vars)
   if (length(missing_tprf) > 0)
     stop("tprf_vars not found in dta_trans: ", paste(missing_tprf, collapse = ", "))
+  tprf_vars    <- lag_res_tprf$vars
 
   lag_res     <- auto_create_lags(fixed_vars, dta_trans, verbose = verbose)
   dta_trans   <- lag_res$dta_trans
