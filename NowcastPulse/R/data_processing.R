@@ -12,13 +12,19 @@ parse_date_by_type <- function(date_vec, dataset_type) {
   switch(dataset_type,
     daily     = as.Date(x, format = "%Y%m%d"),
     daily_oil = as.Date(x, format = "%m/%d/%Y"),
-    # Weekly dates are stored as "M/YY/CCYY"
-    # (e.g. "1/16/2026" = January 2016).
+    # Weekly dates are stored as full "M/D/CCYY" strings (same convention
+    # as daily_oil), e.g. "1/16/2010". Fall back to the legacy 2-token
+    # "M/YY" format (e.g. "1/24") for any callers still using it.
     weekly    = {
-      parts     <- strsplit(x, "/")
-      month_val <- as.integer(vapply(parts, `[`, character(1L), 1L))
-      year2     <- as.integer(vapply(parts, `[`, character(1L), 2L))
-      as.Date(sprintf("%04d-%02d-01", 2000L + year2, month_val))
+      parsed <- as.Date(x, format = "%m/%d/%Y")
+      na_idx <- which(is.na(parsed) & !is.na(x))
+      if (length(na_idx) > 0) {
+        parts     <- strsplit(x[na_idx], "/")
+        month_val <- as.integer(vapply(parts, `[`, character(1L), 1L))
+        year2     <- as.integer(vapply(parts, `[`, character(1L), 2L))
+        parsed[na_idx] <- as.Date(sprintf("%04d-%02d-01", 2000L + year2, month_val))
+      }
+      parsed
     },
     monthly   = as.Date(paste0(gsub("-", "", x), "01"), format = "%Y%m%d"),
     quarterly = {
@@ -67,10 +73,15 @@ adjust_seasonal_align <- function(x, dates, freq) {
 
   if (is.null(fit)) return(x)
 
-  sa_trim <- as.numeric(seasonal::final(fit))
+  sa_trim <- tryCatch(as.numeric(seasonal::final(fit)), error = function(e) numeric(0))
+
+  # A degenerate ARIMA(0,0,0) model can make seasonal::final() silently
+  # return a zero-length vector; fall back to the unadjusted series rather
+  # than writing into a mis-sized (or descending, when empty) index range.
+  if (length(sa_trim) != length(x_trim)) return(x)
 
   out <- rep(NA_real_, n)
-  out[first_valid:(first_valid + length(sa_trim) - 1L)] <- sa_trim
+  out[first_valid:last_valid] <- sa_trim
   out
 }
 
