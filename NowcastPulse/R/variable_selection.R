@@ -142,17 +142,20 @@ auto_create_lags <- function(vars, dta_trans, verbose = TRUE) {
 }
 
 # ---- Internal: OOS MAE for a fixed variable set ---------------
+# base_controls (e.g. AR lags, structural dummies) are forced into every
+# trial model in addition to hf_vars; they are never ADD/DROP candidates.
 #' @noRd
-eval_oos_mae <- function(hf_vars, bridge_full, eval_months, dep_var) {
-  if (length(hf_vars) == 0) return(Inf)
+eval_oos_mae <- function(hf_vars, bridge_full, eval_months, dep_var, base_controls = NULL) {
+  if (length(hf_vars) == 0 && length(base_controls) == 0) return(Inf)
+  model_vars <- unique(c(base_controls, hf_vars))
   errors <- vapply(eval_months, function(t_month) {
-    train_df <- bridge_full[bridge_full$date < t_month, c(dep_var, hf_vars), drop = FALSE]
+    train_df <- bridge_full[bridge_full$date < t_month, c(dep_var, model_vars), drop = FALSE]
     train_df <- stats::na.omit(train_df)
-    if (nrow(train_df) < length(hf_vars) + 2) return(NA_real_)
-    fml <- stats::as.formula(paste(dep_var, "~", paste(hf_vars, collapse = " + ")))
+    if (nrow(train_df) < length(model_vars) + 2) return(NA_real_)
+    fml <- stats::as.formula(paste(dep_var, "~", paste(model_vars, collapse = " + ")))
     fit <- tryCatch(stats::lm(fml, data = train_df), error = function(e) NULL)
     if (is.null(fit)) return(NA_real_)
-    pred_row <- bridge_full[bridge_full$date == t_month, hf_vars, drop = FALSE]
+    pred_row <- bridge_full[bridge_full$date == t_month, model_vars, drop = FALSE]
     if (any(is.na(pred_row))) return(NA_real_)
     pred_val <- as.numeric(stats::predict(fit, newdata = pred_row))
     actual   <- bridge_full[bridge_full$date == t_month, dep_var, drop = TRUE]
@@ -162,14 +165,18 @@ eval_oos_mae <- function(hf_vars, bridge_full, eval_months, dep_var) {
 }
 
 # ---- Internal: forward-backward stepwise ----------------------
+# base_controls stay in every trial/final model; only `candidates` are
+# subject to the forward (ADD) / backward (DROP) search.
 #' @noRd
 run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
-                                 dep_var, corr_tbl, min_improve = 0.005) {
+                                 dep_var, corr_tbl, min_improve = 0.005,
+                                 base_controls = NULL) {
+  candidates <- setdiff(candidates, base_controls)
   init_var <- corr_tbl$variable[corr_tbl$variable %in% candidates][1]
   if (is.na(init_var)) stop("No valid candidate to initialise stepwise selection.")
 
   selected    <- init_var
-  current_mae <- eval_oos_mae(selected, bridge_full, eval_months, dep_var)
+  current_mae <- eval_oos_mae(selected, bridge_full, eval_months, dep_var, base_controls)
   message("  Init: [", init_var, "]  |  MAE = ", round(current_mae, 6))
 
   # Track history: one row per accepted step
@@ -192,7 +199,7 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
     best_add  <- NULL
     best_mae  <- current_mae
     for (v in remaining) {
-      trial_mae <- eval_oos_mae(c(selected, v), bridge_full, eval_months, dep_var)
+      trial_mae <- eval_oos_mae(c(selected, v), bridge_full, eval_months, dep_var, base_controls)
       if (!is.na(trial_mae) && trial_mae < best_mae * (1 - min_improve)) {
         best_mae <- trial_mae
         best_add <- v
@@ -217,7 +224,7 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
       best_drop     <- NULL
       best_mae_drop <- current_mae
       for (v in selected) {
-        trial_mae <- eval_oos_mae(setdiff(selected, v), bridge_full, eval_months, dep_var)
+        trial_mae <- eval_oos_mae(setdiff(selected, v), bridge_full, eval_months, dep_var, base_controls)
         if (!is.na(trial_mae) && trial_mae < best_mae_drop * (1 - min_improve)) {
           best_mae_drop <- trial_mae
           best_drop     <- v
@@ -457,6 +464,13 @@ np_rank_correlations <- function(dta_trans, dep_var, candidates = NULL) {
 #' @param dummy_vars Character vector of dummy column names to always include
 #'   in the candidate pool regardless of correlation.  Defaults to
 #'   \code{NULL}.
+#' @param base_controls Character vector of column names (typically AR lags
+#'   of \code{dep_var} and/or structural break dummies, e.g.
+#'   \code{c("im_SA_lag1", "im_SA_lag2", "d_covid")}) that are forced into
+#'   every trial and final model rather than being treated as ADD/DROP
+#'   candidates. They are excluded from the correlation-ranked candidate
+#'   pool and from post-estimation pruning, so they are never dropped.
+#'   Defaults to \code{NULL} (no forced regressors; matches prior behaviour).
 #' @param out_dir Character. Path to a directory where output files will be
 #'   saved.  If \code{NULL} (default), no files are written.  When supplied,
 #'   the following files are created:
@@ -520,6 +534,7 @@ np_select_variables <- function(dta_trans,
                                 corr_threshold = 0.4,
                                 min_improve    = 0.005,
                                 dummy_vars     = NULL,
+                                base_controls  = NULL,
                                 out_dir        = NULL,
                                 verbose        = TRUE) {
 
@@ -529,8 +544,12 @@ np_select_variables <- function(dta_trans,
   if (!dep_var %in% names(dta_trans))
     stop("'", dep_var, "' not found in dta_trans.")
 
-  # ---- Step 1: All columns except date and dep_var are candidates ----
-  all_candidates <- setdiff(names(dta_trans), c("date", dep_var))
+  missing_bc <- setdiff(base_controls, names(dta_trans))
+  if (length(missing_bc) > 0)
+    stop("base_controls not found in dta_trans: ", paste(missing_bc, collapse = ", "))
+
+  # ---- Step 1: All columns except date, dep_var, and base_controls ----
+  all_candidates <- setdiff(names(dta_trans), c("date", dep_var, base_controls))
 
   # ---- Step 2: Correlation ranking ----
   if (verbose) message("Step 1: Ranking candidates by |r| ...")
@@ -565,7 +584,7 @@ np_select_variables <- function(dta_trans,
                         length(candidates_filtered), " variables")
 
   # ---- Step 5: Build bridge_full with ARIMA imputation ----
-  keep_cols   <- intersect(c("date", dep_var, candidates_filtered), names(dta_trans))
+  keep_cols   <- intersect(c("date", dep_var, base_controls, candidates_filtered), names(dta_trans))
   bridge_full <- dta_trans[, keep_cols, drop = FALSE]
   bridge_full <- bridge_full[order(bridge_full$date), ]
 
@@ -593,12 +612,13 @@ np_select_variables <- function(dta_trans,
 
   # ---- Step 7: Stepwise ----
   sw_result <- run_stepwise_oos_mae(
-    candidates  = candidates_filtered,
-    bridge_full = bridge_full,
-    eval_months = eval_months,
-    dep_var     = dep_var,
-    corr_tbl    = corr_tbl,
-    min_improve = min_improve
+    candidates    = candidates_filtered,
+    bridge_full   = bridge_full,
+    eval_months   = eval_months,
+    dep_var       = dep_var,
+    corr_tbl      = corr_tbl,
+    min_improve   = min_improve,
+    base_controls = base_controls
   )
 
   if (verbose) {
@@ -614,7 +634,7 @@ np_select_variables <- function(dta_trans,
   # ---- Step 8: Final model on ALL available observations ----
   if (verbose) message("Step 3: Estimating final model on all observations ...")
 
-  final_vars <- intersect(sw_result$vars, names(dta_trans))
+  final_vars <- intersect(unique(c(base_controls, sw_result$vars)), names(dta_trans))
   train_df   <- dta_trans[, c("date", dep_var, final_vars), drop = FALSE]
   train_df   <- stats::na.omit(train_df)
 
@@ -622,7 +642,8 @@ np_select_variables <- function(dta_trans,
   final_model      <- stats::lm(fml, data = train_df)
 
   # ---- Step 9: Post-estimation pruning (maximise Adj R²) ----
-  if (verbose) message("Step 4: Post-estimation pruning (Adj R\u00b2) ...")
+  # base_controls are exempt: they are forced regressors, never dropped here.
+  if (verbose) message("Step 4: Post-estimation pruning (Adj R²) ...")
 
   pruned <- TRUE
   while (pruned) {
@@ -630,7 +651,7 @@ np_select_variables <- function(dta_trans,
     sm           <- summary(final_model)
     current_adjr <- sm$adj.r.squared
     pvals        <- stats::coef(sm)[, "Pr(>|t|)"]
-    droppable    <- pvals[names(pvals) != "(Intercept)"]
+    droppable    <- pvals[!names(pvals) %in% c("(Intercept)", base_controls)]
     if (length(droppable) == 0) break
     ns_vars      <- droppable[droppable > 0.05]
     if (length(ns_vars) == 0) break
@@ -801,6 +822,11 @@ np_select_variables <- function(dta_trans,
 #'   accept an ADD or DROP step.  Defaults to \code{0.005}.
 #' @param dummy_vars Character vector of dummy column names to always include
 #'   in the candidate pool.  Defaults to \code{NULL}.
+#' @param base_controls Character vector of column names forced into every
+#'   trial and final model (e.g. AR lags of \code{dep_var}, structural break
+#'   dummies). Excluded from the candidate pool and from post-estimation
+#'   pruning, so they are never dropped. Defaults to \code{NULL}. See
+#'   \code{\link{np_select_variables}}.
 #' @param interpolate_vars Character vector of variable names to interpolate
 #'   right after the combined dataset is built (see
 #'   \code{\link{np_interpolate_data}}), before transformation. Values of
@@ -854,6 +880,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
                                   corr_threshold = 0.4,
                                   min_improve    = 0.005,
                                   dummy_vars     = NULL,
+                                  base_controls  = NULL,
                                   interpolate_vars = NULL,
                                   zero_as_na       = TRUE,
                                   out_dir        = NULL,
@@ -912,6 +939,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
     corr_threshold = corr_threshold,
     min_improve    = min_improve,
     dummy_vars     = dummy_vars,
+    base_controls  = base_controls,
     out_dir        = out_dir,
     verbose        = verbose
   )

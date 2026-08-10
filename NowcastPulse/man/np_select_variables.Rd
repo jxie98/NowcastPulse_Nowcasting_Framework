@@ -12,6 +12,7 @@ np_select_variables(
   corr_threshold = 0.4,
   min_improve = 0.005,
   dummy_vars = NULL,
+  base_controls = NULL,
   out_dir = NULL,
   verbose = TRUE
 )
@@ -39,6 +40,14 @@ accept an ADD or DROP step.  Defaults to \code{0.005} (0.5\%).}
 \item{dummy_vars}{Character vector of dummy column names to always include
 in the candidate pool regardless of correlation.  Defaults to
 \code{NULL}.}
+
+\item{base_controls}{Character vector of column names (typically AR lags
+of \code{dep_var} and/or structural break dummies, e.g.
+\code{c("im_SA_lag1", "im_SA_lag2", "d_covid")}) that are forced into
+every trial and final model rather than being treated as ADD/DROP
+candidates. They are excluded from the correlation-ranked candidate
+pool and from post-estimation pruning, so they are never dropped.
+Defaults to \code{NULL} (no forced regressors; matches prior behaviour).}
 
 \item{out_dir}{Character. Path to a directory where output files will be
 saved.  If \code{NULL} (default), no files are written.  When supplied,

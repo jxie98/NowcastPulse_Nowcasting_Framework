@@ -1,7 +1,7 @@
 Package: NowcastPulse
 Type: Package
 Title: A Comprehensive Nowcasting Framework for Economic Indicators
-Version: 0.1.2
+Version: 0.1.3
 Authors@R: c(
     person("NowcastPulse Advisory Group", role = c("aut", "cre"),
            email = "contact@nowcastpulse.com")

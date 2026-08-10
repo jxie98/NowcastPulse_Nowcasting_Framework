@@ -1,3 +1,18 @@
+# NowcastPulse 0.1.3
+
+## Enhancements
+
+* `np_select_variables()` / `np_baseline_selection()`: added a `base_controls`
+  argument. Columns listed there (typically AR lags of `dep_var` and/or
+  structural break dummies) are forced into every trial model during the
+  forward-backward stepwise search and into the final model, rather than
+  being treated as ADD/DROP candidates. They are excluded from the
+  correlation-ranked candidate pool and exempt from post-estimation
+  pruning, so they can never be dropped. Aligns the package's variable
+  selection with the fixed-base-controls bridge-model methodology used in
+  the India/US GDP nowcasting demo scripts. Defaults to `NULL`, so existing
+  calls are unaffected.
+
 # NowcastPulse 0.1.2
 
 ## Enhancements

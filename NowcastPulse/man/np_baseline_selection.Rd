@@ -16,6 +16,7 @@ np_baseline_selection(
   corr_threshold = 0.4,
   min_improve = 0.005,
   dummy_vars = NULL,
+  base_controls = NULL,
   interpolate_vars = NULL,
   zero_as_na = TRUE,
   out_dir = NULL,
@@ -61,6 +62,12 @@ accept an ADD or DROP step.  Defaults to \code{0.005}.}
 
 \item{dummy_vars}{Character vector of dummy column names to always include
 in the candidate pool.  Defaults to \code{NULL}.}
+
+\item{base_controls}{Character vector of column names forced into every
+trial and final model (e.g. AR lags of \code{dep_var}, structural break
+dummies). Excluded from the candidate pool and from post-estimation
+pruning, so they are never dropped. Defaults to \code{NULL}. See
+\code{\link{np_select_variables}}.}
 
 \item{interpolate_vars}{Character vector of variable names to interpolate
 right after the combined dataset is built (see
