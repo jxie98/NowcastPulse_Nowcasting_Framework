@@ -17,7 +17,7 @@ summary_oos_metrics <- function(oos_preds) {
     return(data.frame(N_Obs = 0L, MAE = NA_real_, RMSE = NA_real_,
                       MAPE = NA_real_, Bias = NA_real_,
                       Correlation = NA_real_, HitRate = NA_real_,
-                      TheilU2 = NA_real_))
+                      DirAccuracy = NA_real_, TheilU2 = NA_real_))
   }
 
   err  <- ev$predicted - ev$actual
@@ -37,6 +37,15 @@ summary_oos_metrics <- function(oos_preds) {
     if (any(valid)) hit_rate <- mean(sign(actual_diff[valid]) == sign(pred_diff[valid])) * 100
   }
 
+  # Directional accuracy: does the level itself (e.g. a growth/change rate)
+  # have the same sign as actual (expansion vs. contraction call), as
+  # opposed to HitRate above (period-over-period change in that rate).
+  # Periods where actual == 0 are excluded (sign is ambiguous).
+  dir_accuracy <- NA_real_
+  dir_valid <- !is.na(ev$actual) & !is.na(ev$predicted) & ev$actual != 0
+  if (any(dir_valid))
+    dir_accuracy <- mean(sign(ev$predicted[dir_valid]) == sign(ev$actual[dir_valid])) * 100
+
   # Theil U2: RMSE(model) / RMSE(naive random-walk); <1 beats no-change forecast
   theil_u2 <- NA_real_
   if (n >= 2) {
@@ -49,7 +58,7 @@ summary_oos_metrics <- function(oos_preds) {
 
   data.frame(N_Obs = n, MAE = mae, RMSE = rmse, MAPE = mape,
             Bias = bias, Correlation = corr, HitRate = hit_rate,
-            TheilU2 = theil_u2)
+            DirAccuracy = dir_accuracy, TheilU2 = theil_u2)
 }
 
 
@@ -62,8 +71,15 @@ summary_oos_metrics <- function(oos_preds) {
 #' period and model, an Excel export of each model's nowcast for the
 #' next period immediately after the last observed actual, stacked and
 #' per-model comparison charts, and an evaluation-metrics table (MAE,
-#' RMSE, MAPE, Bias, Correlation, directional Hit Rate) with the best
-#' model per metric highlighted.
+#' RMSE, MAPE, Bias, Correlation, HitRate, DirAccuracy) with the best
+#' model per metric highlighted. \code{HitRate} and \code{DirAccuracy}
+#' are both directional-accuracy metrics but answer different questions:
+#' \code{HitRate} is the \% of OOS periods where the period-over-period
+#' \emph{change} in the predicted value moves the same way as the actual
+#' change (turning points), while \code{DirAccuracy} is the \% of OOS
+#' periods where \code{predicted} and \code{actual} simply have the same
+#' sign (e.g. both call growth vs. both call contraction) — the more
+#' relevant one when \code{dep_var} is already a growth/change rate.
 #'
 #' Every \code{np_model_*()} function in this package returns
 #' \code{oos_preds} with the same three columns (\code{date},
@@ -100,7 +116,8 @@ summary_oos_metrics <- function(oos_preds) {
 #'     next period being nowcast.}
 #'   \item{\code{eval_metrics}}{Data frame of \code{Model}, \code{N_Obs},
 #'     \code{MAE}, \code{RMSE}, \code{MAPE}, \code{Bias},
-#'     \code{Correlation}, \code{HitRate}, \code{TheilU2}, one row per model.}
+#'     \code{Correlation}, \code{HitRate}, \code{DirAccuracy},
+#'     \code{TheilU2}, one row per model.}
 #' }
 #'
 #' @examples
@@ -359,7 +376,7 @@ np_model_summary <- function(model_outputs,
     metric_direction <- list(
       MAE = "min", RMSE = "min", MAPE = "min",
       Bias = "min_abs", Correlation = "max", HitRate = "max",
-      TheilU2 = "min"
+      DirAccuracy = "max", TheilU2 = "min"
     )
     best_style <- openxlsx::createStyle(fgFill = "#C6EFCE", textDecoration = "bold")
 

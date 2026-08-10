@@ -46,7 +46,8 @@ Invisibly, a named list with elements:
     next period being nowcast.}
   \item{\code{eval_metrics}}{Data frame of \code{Model}, \code{N_Obs},
     \code{MAE}, \code{RMSE}, \code{MAPE}, \code{Bias},
-    \code{Correlation}, \code{HitRate}, \code{TheilU2}, one row per model.}
+    \code{Correlation}, \code{HitRate}, \code{DirAccuracy},
+    \code{TheilU2}, one row per model.}
 }
 }
 \description{
@@ -57,8 +58,15 @@ a wide/long Excel export of actual vs. nowcast values for every OOS
 period and model, an Excel export of each model's nowcast for the
 next period immediately after the last observed actual, stacked and
 per-model comparison charts, and an evaluation-metrics table (MAE,
-RMSE, MAPE, Bias, Correlation, directional Hit Rate) with the best
-model per metric highlighted.
+RMSE, MAPE, Bias, Correlation, HitRate, DirAccuracy) with the best
+model per metric highlighted. \code{HitRate} and \code{DirAccuracy}
+are both directional-accuracy metrics but answer different questions:
+\code{HitRate} is the \% of OOS periods where the period-over-period
+\emph{change} in the predicted value moves the same way as the actual
+change (turning points), while \code{DirAccuracy} is the \% of OOS
+periods where \code{predicted} and \code{actual} simply have the same
+sign (e.g. both call growth vs. both call contraction) — the more
+relevant one when \code{dep_var} is already a growth/change rate.
 }
 \details{
 Every \code{np_model_*()} function in this package returns

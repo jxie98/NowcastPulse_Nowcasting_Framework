@@ -1,3 +1,18 @@
+# NowcastPulse 0.1.6
+
+## Enhancements
+
+* `np_model_summary()`: added a `DirAccuracy` column to `eval_metrics`
+  — the \% of OOS periods where `sign(predicted) == sign(actual)` (e.g.
+  both call growth vs. both call contraction). This is distinct from the
+  existing `HitRate`, which measures whether the period-over-period
+  *change* in the predicted value moves the same way as the actual change
+  (turning points). `DirAccuracy` is the more relevant metric when
+  `dep_var` is already a growth/change rate, since it directly answers
+  "what \% of the time did the model call the right direction of GDP
+  growth". Included in the Excel evaluation-metrics export with
+  best-model highlighting (higher is better).
+
 # NowcastPulse 0.1.5
 
 ## Enhancements
