@@ -18,7 +18,11 @@ np_model_summary(
 XGBoost = xgboost_out, RandomForest = randomforest_out)}). Names
 are used as model labels throughout (columns, legends, filenames)
 and must be unique. Each element must contain an \code{oos_preds}
-data frame with columns \code{date}, \code{actual}, \code{predicted}.}
+data frame with columns \code{date}, \code{actual}, \code{predicted}.
+Any element that is \code{NULL} (e.g. a model you haven't run yet) or
+lacks a valid \code{oos_preds} is skipped with a message rather than
+raising an error \u2014 the comparison proceeds with whichever models
+remain, as long as at least one is valid.}
 
 \item{dep_var}{Character. Dependent variable name, used for axis/
 sheet labelling only. Defaults to \code{"dep_var"}.}

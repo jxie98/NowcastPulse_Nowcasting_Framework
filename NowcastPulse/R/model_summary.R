@@ -94,6 +94,10 @@ summary_oos_metrics <- function(oos_preds) {
 #'   are used as model labels throughout (columns, legends, filenames)
 #'   and must be unique. Each element must contain an \code{oos_preds}
 #'   data frame with columns \code{date}, \code{actual}, \code{predicted}.
+#'   Any element that is \code{NULL} (e.g. a model you haven't run yet) or
+#'   lacks a valid \code{oos_preds} is skipped with a message rather than
+#'   raising an error \u2014 the comparison proceeds with whichever models
+#'   remain, as long as at least one is valid.
 #' @param dep_var Character. Dependent variable name, used for axis/
 #'   sheet labelling only. Defaults to \code{"dep_var"}.
 #' @param out_dir Character. Directory where output files are written.
@@ -149,15 +153,27 @@ np_model_summary <- function(model_outputs,
   if (!is.list(model_outputs) || length(model_outputs) == 0)
     stop("model_outputs must be a non-empty named list of np_model_*() outputs.")
 
-  model_names <- names(model_outputs)
-  if (is.null(model_names) || any(model_names == "") || anyDuplicated(model_names))
+  model_names_all <- names(model_outputs)
+  if (is.null(model_names_all) || any(model_names_all == "") || anyDuplicated(model_names_all))
     stop("model_outputs must be a named list with unique, non-empty names.")
 
-  for (m in model_names) {
+  # Skip any model that hasn't been run yet (NULL) or lacks a valid
+  # $oos_preds, rather than failing the whole comparison outright.
+  is_valid <- vapply(model_names_all, function(m) {
     op <- model_outputs[[m]]$oos_preds
-    if (is.null(op) || !all(c("date", "actual", "predicted") %in% names(op)))
-      stop("model_outputs[['", m, "']] has no valid $oos_preds (need date/actual/predicted).")
+    !is.null(op) && all(c("date", "actual", "predicted") %in% names(op))
+  }, logical(1))
+
+  if (!all(is_valid)) {
+    skipped <- model_names_all[!is_valid]
+    if (verbose) message("  Skipping model(s) with no valid $oos_preds (need date/actual/predicted): ",
+                          paste(skipped, collapse = ", "))
+    model_outputs <- model_outputs[is_valid]
   }
+
+  model_names <- names(model_outputs)
+  if (length(model_names) == 0)
+    stop("None of the supplied model_outputs have a valid $oos_preds (need date/actual/predicted).")
 
   if (!is.null(out_dir) && !dir.exists(out_dir))
     dir.create(out_dir, recursive = TRUE)

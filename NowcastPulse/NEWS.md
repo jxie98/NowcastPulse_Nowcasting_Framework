@@ -1,3 +1,12 @@
+# NowcastPulse 0.1.7
+
+## Enhancements
+
+* `np_model_summary()`: entries in `model_outputs` that are `NULL` (e.g. a
+  model you haven't run yet) or lack a valid `oos_preds` are now skipped
+  with a message instead of raising an error, so the comparison can run
+  with whichever models are available. Still errors if none are valid.
+
 # NowcastPulse 0.1.6
 
 ## Enhancements

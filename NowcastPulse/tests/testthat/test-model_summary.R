@@ -49,3 +49,50 @@ test_that("HitRate and DirAccuracy measure different things", {
   expect_equal(m$HitRate, 100)                 # every period-over-period change direction matches
   expect_lt(m$DirAccuracy, m$HitRate)           # but sign(predicted) never matches the final positive actual
 })
+
+make_oos_preds <- function(seed) {
+  set.seed(seed)
+  n <- 12
+  data.frame(
+    date      = seq(as.Date("2023-01-01"), by = "month", length.out = n),
+    actual    = rnorm(n),
+    predicted = rnorm(n)
+  )
+}
+
+test_that("np_model_summary skips NULL model entries instead of erroring", {
+  model_outputs <- list(
+    Bridge = list(oos_preds = make_oos_preds(1)),
+    PCA    = NULL,                                   # not run yet
+    DFM    = list(oos_preds = make_oos_preds(2))
+  )
+
+  expect_message(
+    result <- np_model_summary(model_outputs, dep_var = "y", verbose = TRUE),
+    "Skipping model.*PCA"
+  )
+
+  expect_equal(sort(result$eval_metrics$Model), c("Bridge", "DFM"))
+  expect_false("PCA" %in% names(result$oos_wide))
+})
+
+test_that("np_model_summary skips entries with invalid/missing oos_preds", {
+  model_outputs <- list(
+    Bridge = list(oos_preds = make_oos_preds(1)),
+    XGBoost = list(oos_preds = data.frame(date = Sys.Date())),  # missing actual/predicted cols
+    DFM = list(oos_preds = make_oos_preds(2))
+  )
+
+  result <- np_model_summary(model_outputs, dep_var = "y", verbose = FALSE)
+
+  expect_equal(sort(result$eval_metrics$Model), c("Bridge", "DFM"))
+})
+
+test_that("np_model_summary errors only when every model is invalid", {
+  model_outputs <- list(Bridge = NULL, PCA = NULL)
+
+  expect_error(
+    np_model_summary(model_outputs, dep_var = "y", verbose = FALSE),
+    "None of the supplied model_outputs"
+  )
+})
