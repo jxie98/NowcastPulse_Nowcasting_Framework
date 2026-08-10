@@ -1,3 +1,18 @@
+# NowcastPulse 0.1.4
+
+## Enhancements
+
+* `np_baseline_selection()`: when `out_dir` is supplied, its entire return
+  value (`raw`, `processed`, `dta_trans`, `selection`) is now also saved as
+  a single `baseline_selection_<dep_var>.rds` file.
+* Added `np_load_baseline_selection(out_dir, dep_var)` to reload that file
+  in a later session. Since every `np_model_*()` function only needs
+  `dta_trans` (plus `dep_var`/variable names/OOS dates), users can now run
+  `np_baseline_selection()` once, then reload its saved output and go
+  straight to `np_model_bridge()`, `np_model_pca()`, `np_model_dfm()`, etc.
+  without re-running data loading, processing, transformation, and
+  variable selection every time.
+
 # NowcastPulse 0.1.3
 
 ## Enhancements

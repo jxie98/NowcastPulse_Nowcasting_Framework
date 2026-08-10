@@ -54,3 +54,32 @@ test_that("np_select_variables errors if a base_controls column is missing", {
     "base_controls not found"
   )
 })
+
+test_that("np_load_baseline_selection() round-trips what np_baseline_selection() saves", {
+  tmp_dir <- tempfile("baseline_")
+  dir.create(tmp_dir)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  fake_result <- list(
+    raw       = list(trans_map = c(x = "PCHY")),
+    processed = list(combined = data.frame(date = "2020-01", x = 1)),
+    dta_trans = data.frame(date = as.Date("2020-01-01"), y_SA = 1, x_SA = 2),
+    selection = list(selected_vars = c("x_SA"), final_model = NULL)
+  )
+  saveRDS(fake_result, file.path(tmp_dir, "baseline_selection_y_SA.rds"))
+
+  loaded <- np_load_baseline_selection(tmp_dir, dep_var = "y_SA")
+
+  expect_equal(loaded, fake_result)
+})
+
+test_that("np_load_baseline_selection() errors when no saved file exists", {
+  tmp_dir <- tempfile("baseline_")
+  dir.create(tmp_dir)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  expect_error(
+    np_load_baseline_selection(tmp_dir, dep_var = "y_SA"),
+    "No saved baseline selection found"
+  )
+})

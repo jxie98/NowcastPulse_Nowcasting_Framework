@@ -83,7 +83,11 @@ interior \code{NA} gaps are filled via natural cubic spline. Defaults to
 
 \item{out_dir}{Character. If supplied, all output files from
 \code{np_transform_data} and \code{np_select_variables} are written
-here.  Defaults to \code{NULL}.}
+here, plus a single \code{baseline_selection_<dep_var>.rds} bundling
+this function's entire return value. Reload it in a later session with
+\code{\link{np_load_baseline_selection}} to run other
+\code{np_model_*()} functions on \code{dta_trans} without re-running
+this pipeline.  Defaults to \code{NULL} (nothing saved to disk).}
 
 \item{save_processed}{Logical. If \code{TRUE} (default), processed SA CSVs
 are saved to \code{data_dir/Processed/} by \code{np_process_data}.}

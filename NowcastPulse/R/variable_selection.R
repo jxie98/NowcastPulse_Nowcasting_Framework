@@ -839,7 +839,11 @@ np_select_variables <- function(dta_trans,
 #'   \code{NULL}.
 #' @param out_dir Character. If supplied, all output files from
 #'   \code{np_transform_data} and \code{np_select_variables} are written
-#'   here.  Defaults to \code{NULL}.
+#'   here, plus a single \code{baseline_selection_<dep_var>.rds} bundling
+#'   this function's entire return value. Reload it in a later session with
+#'   \code{\link{np_load_baseline_selection}} to run other
+#'   \code{np_model_*()} functions on \code{dta_trans} without re-running
+#'   this pipeline.  Defaults to \code{NULL} (nothing saved to disk).
 #' @param save_processed Logical. If \code{TRUE} (default), processed SA CSVs
 #'   are saved to \code{data_dir/Processed/} by \code{np_process_data}.
 #' @param verbose Logical. If \code{TRUE} (default), progress messages are
@@ -946,10 +950,76 @@ np_baseline_selection <- function(data_dir       = "Data/",
 
   if (verbose) message("=== Baseline selection complete. ===")
 
-  invisible(list(
+  result <- list(
     raw       = raw,
     processed = processed,
     dta_trans = dta_trans,
     selection = selection
-  ))
+  )
+
+  # Persist everything needed to run other np_model_*() functions later
+  # without re-running this pipeline (see np_load_baseline_selection()).
+  if (!is.null(out_dir)) {
+    safe_name <- gsub("[^A-Za-z0-9_]", "_", dep_var)
+    rds_path  <- file.path(out_dir, paste0("baseline_selection_", safe_name, ".rds"))
+    saveRDS(result, rds_path)
+    if (verbose) message("  Saved: ", basename(rds_path))
+  }
+
+  invisible(result)
+}
+
+
+# ---- Exported function: np_load_baseline_selection -------------
+
+#' Reload a previously saved \code{np_baseline_selection()} result
+#'
+#' Reads back the RDS file written by \code{\link{np_baseline_selection}}
+#' (when called with a non-\code{NULL} \code{out_dir}), so that
+#' \code{dta_trans} and the variable-selection results can be reused in a
+#' later session — e.g. to run \code{\link{np_model_bridge}},
+#' \code{\link{np_model_pca}}, \code{\link{np_model_dfm}}, or any other
+#' \code{np_model_*()} function — without re-running data loading,
+#' processing, transformation, and selection from scratch.
+#'
+#' @param out_dir Character. The \code{out_dir} that was passed to the
+#'   original \code{\link{np_baseline_selection}} call.
+#' @param dep_var Character. The \code{dep_var} that was passed to the
+#'   original \code{\link{np_baseline_selection}} call (used to build the
+#'   saved file name).
+#'
+#' @return The same named list returned (invisibly) by
+#'   \code{\link{np_baseline_selection}}: \code{raw}, \code{processed},
+#'   \code{dta_trans}, \code{selection}.
+#'
+#' @examples
+#' \dontrun{
+#' # Session 1
+#' np_baseline_selection(
+#'   data_dir  = "Data/", prefix = "Fiji", dep_var = "im_SA",
+#'   oos_start = as.Date("2020-01-01"), oos_end = as.Date("2025-12-01"),
+#'   out_dir   = "Outputs/1_Baseline"
+#' )
+#'
+#' # Session 2 (later) — no need to re-run np_baseline_selection()
+#' result    <- np_load_baseline_selection("Outputs/1_Baseline", dep_var = "im_SA")
+#' dta_trans <- result$dta_trans
+#'
+#' bridge_out <- np_model_bridge(
+#'   dta_trans  = dta_trans,
+#'   dep_var    = "im_SA",
+#'   model_vars = result$selection$selected_vars,
+#'   oos_start  = as.Date("2024-01-01"),
+#'   oos_end    = as.Date("2026-04-01")
+#' )
+#' }
+#'
+#' @export
+np_load_baseline_selection <- function(out_dir, dep_var) {
+  safe_name <- gsub("[^A-Za-z0-9_]", "_", dep_var)
+  rds_path  <- file.path(out_dir, paste0("baseline_selection_", safe_name, ".rds"))
+  if (!file.exists(rds_path))
+    stop("No saved baseline selection found at '", rds_path, "'. ",
+         "Run np_baseline_selection(..., out_dir = '", out_dir, "') first.")
+  readRDS(rds_path)
 }
