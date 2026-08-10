@@ -34,6 +34,38 @@ test_that("adjust_seasonal_align falls back to unadjusted series when seasonal::
   expect_equal(out, x)
 })
 
+test_that("adjust_seasonal_align refits with a standard airline model when SEATS selects (0 0 0)", {
+  n <- 60
+  dates <- seq(as.Date("2018-01-01"), by = "month", length.out = n)
+  set.seed(1)
+  x <- 100 + cumsum(rnorm(n)) + 5 * sin(seq_len(n) * 2 * pi / 12)
+  sa_values <- x - 1
+
+  calls <- character(0)
+  testthat::local_mocked_bindings(
+    seas = function(..., arima.model = NULL) {
+      calls <<- c(calls, if (is.null(arima.model)) NA_character_ else arima.model)
+      structure(list(), class = "seas")
+    },
+    .package = "seasonal"
+  )
+  testthat::local_mocked_bindings(
+    udg = function(...) "(0 0 0)(0 0 1)",
+    .package = "seasonal"
+  )
+  testthat::local_mocked_bindings(
+    final = function(...) sa_values,
+    .package = "seasonal"
+  )
+
+  out <- adjust_seasonal_align(x, dates = dates, freq = 12)
+
+  expect_equal(out, sa_values)
+  expect_equal(length(calls), 2)
+  expect_true(is.na(calls[1]))
+  expect_equal(calls[2], "(0 1 1)(0 1 1)")
+})
+
 test_that("adjust_seasonal_align returns the seasonally adjusted series on success", {
   n <- 60
   dates <- seq(as.Date("2018-01-01"), by = "month", length.out = n)

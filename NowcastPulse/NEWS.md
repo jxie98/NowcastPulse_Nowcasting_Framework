@@ -1,3 +1,14 @@
+# NowcastPulse 0.1.2
+
+## Enhancements
+
+* Internal `adjust_seasonal_align()`: when X-13/SEATS identifies a degenerate
+  non-seasonal `(0 0 0)` ARIMA model, the series is now refit with a
+  standard airline model (`(0 1 1)(0 1 1)`) so it still gets a real
+  seasonal adjustment instead of silently falling through to the raw,
+  unadjusted series. The unadjusted-series fallback is kept as a last
+  resort if the refit still fails or produces a mismatched-length result.
+
 # NowcastPulse 0.1.1
 
 ## Bug fixes

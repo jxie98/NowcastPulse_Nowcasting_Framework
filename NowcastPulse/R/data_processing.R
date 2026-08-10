@@ -73,11 +73,22 @@ adjust_seasonal_align <- function(x, dates, freq) {
 
   if (is.null(fit)) return(x)
 
+  # A degenerate non-seasonal (0 0 0) ARIMA model leaves SEATS with nothing
+  # to decompose. Refit with the standard airline model so the series still
+  # gets a real adjustment instead of silently falling through to the raw x.
+  arima_id <- tryCatch(seasonal::udg(fit, "arimamdl"), error = function(e) NA_character_)
+  if (isTRUE(grepl("^\\(0 0 0\\)", arima_id))) {
+    fit <- tryCatch(
+      seasonal::seas(x_ts, x11 = "", arima.model = "(0 1 1)(0 1 1)"),
+      error = function(e) fit
+    )
+  }
+
   sa_trim <- tryCatch(as.numeric(seasonal::final(fit)), error = function(e) numeric(0))
 
-  # A degenerate ARIMA(0,0,0) model can make seasonal::final() silently
-  # return a zero-length vector; fall back to the unadjusted series rather
-  # than writing into a mis-sized (or descending, when empty) index range.
+  # Refit may still fail or seasonal::final() may silently return a
+  # zero-length vector; fall back to the unadjusted series rather than
+  # writing into a mis-sized (or descending, when empty) index range.
   if (length(sa_trim) != length(x_trim)) return(x)
 
   out <- rep(NA_real_, n)
