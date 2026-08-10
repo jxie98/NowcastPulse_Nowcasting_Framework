@@ -1,3 +1,46 @@
+test_that("strip_variable_suffixes() strips trailing _lagN then _SA", {
+  expect_equal(
+    strip_variable_suffixes(c("im_SA_lag12", "cpi_SA", "REER_SA",
+                              "CRISIS_DUMMY_SA", "loan_transport_SA_lag2")),
+    c("im", "cpi", "REER", "CRISIS_DUMMY", "loan_transport")
+  )
+})
+
+test_that("read_variable_descriptions() reads descriptions from data files, Index.csv takes precedence", {
+  tmp_dir <- tempfile("npdata_")
+  raw_dir <- file.path(tmp_dir, "Raw")
+  dir.create(raw_dir, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  # Index.csv defines a description for "im" that should win over the data file
+  write.csv(
+    data.frame(
+      variable_names = c("im", "cpi"),
+      agg_index      = c("Average", "Average"),
+      sa_index       = c("NSA", "NSA"),
+      trans_index    = c("PCHY", "PCHY"),
+      descriptions   = c("Imports (from index)", NA)
+    ),
+    file.path(raw_dir, "Fiji_Index.csv"), row.names = FALSE
+  )
+
+  write.csv(
+    data.frame(
+      variable_names = c("im", "cpi", "petrol"),
+      descriptions   = c("Imports (from data file)", "Consumer Price Index", "Petrol price"),
+      `202001` = c(1, 2, 3), `202002` = c(4, 5, 6),
+      check.names = FALSE
+    ),
+    file.path(raw_dir, "Fiji_Monthly_Data.csv"), row.names = FALSE
+  )
+
+  desc_map <- read_variable_descriptions(tmp_dir, "Fiji")
+
+  expect_equal(unname(desc_map["im"]),     "Imports (from index)")
+  expect_equal(unname(desc_map["cpi"]),    "Consumer Price Index")
+  expect_equal(unname(desc_map["petrol"]), "Petrol price")
+})
+
 test_that("np_select_variables forces base_controls into the final model and never drops them", {
   set.seed(42)
   n     <- 200

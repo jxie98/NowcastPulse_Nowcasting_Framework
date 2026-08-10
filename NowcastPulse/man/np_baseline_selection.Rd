@@ -83,11 +83,24 @@ interior \code{NA} gaps are filled via natural cubic spline. Defaults to
 
 \item{out_dir}{Character. If supplied, all output files from
 \code{np_transform_data} and \code{np_select_variables} are written
-here, plus a single \code{baseline_selection_<dep_var>.rds} bundling
-this function's entire return value. Reload it in a later session with
-\code{\link{np_load_baseline_selection}} to run other
-\code{np_model_*()} functions on \code{dta_trans} without re-running
-this pipeline.  Defaults to \code{NULL} (nothing saved to disk).}
+here, plus:
+\itemize{
+  \item \code{baseline_selection_<dep_var>.rds} — this function's
+    entire return value. Reload it in a later session with
+    \code{\link{np_load_baseline_selection}} to run other
+    \code{np_model_*()} functions on \code{dta_trans} without
+    re-running this pipeline.
+  \item \code{variable_descriptions_<dep_var>.csv} — every column in
+    \code{dta_trans} (\code{variable}), its base variable name with
+    \code{_lagN}/\code{_SA} suffixes stripped (\code{base_variable}),
+    and the human-readable \code{description} looked up from the
+    \code{descriptions} column of the index file / raw data files.
+  \item \code{baseline_vars_<dep_var>.R} — the final
+    \code{selection$selected_vars} formatted as a ready-to-source
+    \code{baseline_vars <- c(...)} script, for quick reuse when
+    setting up other models.
+}
+Defaults to \code{NULL} (nothing saved to disk).}
 
 \item{save_processed}{Logical. If \code{TRUE} (default), processed SA CSVs
 are saved to \code{data_dir/Processed/} by \code{np_process_data}.}

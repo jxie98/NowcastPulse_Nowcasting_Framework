@@ -779,6 +779,48 @@ np_select_variables <- function(dta_trans,
 }
 
 
+# ---- Internal: variable_names -> descriptions lookup ----------
+# Reads the 'descriptions' column (2nd column) from the Index file and each
+# raw data file that defines it; first source to define a given variable
+# name wins. Used to annotate np_baseline_selection()'s saved outputs.
+#' @noRd
+read_variable_descriptions <- function(data_dir, prefix) {
+  raw_dir  <- file.path(data_dir, "Raw")
+  desc_map <- character(0)
+
+  add_source <- function(path) {
+    if (!file.exists(path)) return(invisible(NULL))
+    dta <- tryCatch(read.csv(path, check.names = FALSE, stringsAsFactors = FALSE),
+                     error = function(e) NULL)
+    if (is.null(dta) || !all(c("variable_names", "descriptions") %in% names(dta)))
+      return(invisible(NULL))
+    vn   <- trimws(as.character(dta[["variable_names"]]))
+    ds   <- as.character(dta[["descriptions"]])
+    keep <- !is.na(vn) & nchar(vn) > 0 &
+            !is.na(ds) & nchar(trimws(ds)) > 0 &
+            !vn %in% names(desc_map)
+    if (any(keep)) desc_map[vn[keep]] <<- ds[keep]
+    invisible(NULL)
+  }
+
+  add_source(file.path(raw_dir, paste0(prefix, "_Index.csv")))
+  for (suffix in c("_Daily_Data.csv", "_Daily_Data_Oil.csv", "_Weekly_Data.csv",
+                   "_Monthly_Data.csv", "_Quarterly_Data.csv", "_Annual_Data.csv")) {
+    add_source(file.path(raw_dir, paste0(prefix, suffix)))
+  }
+
+  desc_map
+}
+
+# ---- Internal: strip _lagN / _SA suffixes to recover the base variable ----
+#' @noRd
+strip_variable_suffixes <- function(x) {
+  x <- sub("_lag\\d+$", "", x)
+  x <- sub("_SA$", "", x)
+  x
+}
+
+
 # ---- Exported function: np_baseline_selection -----------------
 
 #' Run the full baseline variable selection pipeline in one call
@@ -839,11 +881,24 @@ np_select_variables <- function(dta_trans,
 #'   \code{NULL}.
 #' @param out_dir Character. If supplied, all output files from
 #'   \code{np_transform_data} and \code{np_select_variables} are written
-#'   here, plus a single \code{baseline_selection_<dep_var>.rds} bundling
-#'   this function's entire return value. Reload it in a later session with
-#'   \code{\link{np_load_baseline_selection}} to run other
-#'   \code{np_model_*()} functions on \code{dta_trans} without re-running
-#'   this pipeline.  Defaults to \code{NULL} (nothing saved to disk).
+#'   here, plus:
+#'   \itemize{
+#'     \item \code{baseline_selection_<dep_var>.rds} — this function's
+#'       entire return value. Reload it in a later session with
+#'       \code{\link{np_load_baseline_selection}} to run other
+#'       \code{np_model_*()} functions on \code{dta_trans} without
+#'       re-running this pipeline.
+#'     \item \code{variable_descriptions_<dep_var>.csv} — every column in
+#'       \code{dta_trans} (\code{variable}), its base variable name with
+#'       \code{_lagN}/\code{_SA} suffixes stripped (\code{base_variable}),
+#'       and the human-readable \code{description} looked up from the
+#'       \code{descriptions} column of the index file / raw data files.
+#'     \item \code{baseline_vars_<dep_var>.R} — the final
+#'       \code{selection$selected_vars} formatted as a ready-to-source
+#'       \code{baseline_vars <- c(...)} script, for quick reuse when
+#'       setting up other models.
+#'   }
+#'   Defaults to \code{NULL} (nothing saved to disk).
 #' @param save_processed Logical. If \code{TRUE} (default), processed SA CSVs
 #'   are saved to \code{data_dir/Processed/} by \code{np_process_data}.
 #' @param verbose Logical. If \code{TRUE} (default), progress messages are
@@ -898,11 +953,11 @@ np_baseline_selection <- function(data_dir       = "Data/",
 
   # Step 1: Load raw data
   if (verbose) message("=== NowcastPulse: Baseline Selection Pipeline ===")
-  if (verbose) message("Step 1/5: Loading raw data ...")
+  if (verbose) message("Step 1/6: Loading raw data ...")
   raw <- np_load_data(data_dir = data_dir, prefix = prefix)
 
   # Step 2: Process data (SA + aggregate + merge)
-  if (verbose) message("Step 2/5: Processing data (X-13, aggregation, merge) ...")
+  if (verbose) message("Step 2/6: Processing data (X-13, aggregation, merge) ...")
   processed <- np_process_data(
     data_dir     = data_dir,
     prefix       = prefix,
@@ -913,7 +968,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
 
   # Step 3: Interpolate specified variables (treat 0 as NA, cubic spline)
   if (!is.null(interpolate_vars)) {
-    if (verbose) message("Step 3/5: Interpolating specified variables ...")
+    if (verbose) message("Step 3/6: Interpolating specified variables ...")
     processed$combined <- np_interpolate_data(
       combined   = processed$combined,
       vars       = interpolate_vars,
@@ -923,7 +978,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
   }
 
   # Step 4: Transform
-  if (verbose) message("Step 4/5: Transforming data ...")
+  if (verbose) message("Step 4/6: Transforming data ...")
   dta_trans <- np_transform_data(
     combined    = processed$combined,
     trans_map   = raw$trans_map,
@@ -934,7 +989,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
   )
 
   # Step 5: Variable selection
-  if (verbose) message("Step 5/5: Variable selection ...")
+  if (verbose) message("Step 5/6: Variable selection ...")
   selection <- np_select_variables(
     dta_trans      = dta_trans,
     dep_var        = dep_var,
@@ -948,6 +1003,34 @@ np_baseline_selection <- function(data_dir       = "Data/",
     verbose        = verbose
   )
 
+  # Step 6: Variable descriptions + a ready-to-source baseline_vars script
+  safe_name <- gsub("[^A-Za-z0-9_]", "_", dep_var)
+  if (!is.null(out_dir)) {
+    if (verbose) message("Step 6/6: Saving variable descriptions and baseline_vars script ...")
+
+    desc_map  <- read_variable_descriptions(data_dir, prefix)
+    dta_vars  <- setdiff(names(dta_trans), "date")
+    desc_tbl  <- data.frame(
+      variable      = dta_vars,
+      base_variable = strip_variable_suffixes(dta_vars),
+      stringsAsFactors = FALSE
+    )
+    desc_tbl$description <- unname(desc_map[desc_tbl$base_variable])
+
+    desc_path <- file.path(out_dir, paste0("variable_descriptions_", safe_name, ".csv"))
+    utils::write.csv(desc_tbl, desc_path, row.names = FALSE, na = "")
+    if (verbose) message("  Saved: ", basename(desc_path))
+
+    n_sel <- length(selection$selected_vars)
+    baseline_vars_lines <- paste0(
+      '  "', selection$selected_vars, '"',
+      ifelse(seq_len(n_sel) < n_sel, ",", "")
+    )
+    script_path <- file.path(out_dir, paste0("baseline_vars_", safe_name, ".R"))
+    writeLines(c("baseline_vars <- c(", baseline_vars_lines, ")"), script_path)
+    if (verbose) message("  Saved: ", basename(script_path))
+  }
+
   if (verbose) message("=== Baseline selection complete. ===")
 
   result <- list(
@@ -960,8 +1043,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
   # Persist everything needed to run other np_model_*() functions later
   # without re-running this pipeline (see np_load_baseline_selection()).
   if (!is.null(out_dir)) {
-    safe_name <- gsub("[^A-Za-z0-9_]", "_", dep_var)
-    rds_path  <- file.path(out_dir, paste0("baseline_selection_", safe_name, ".rds"))
+    rds_path <- file.path(out_dir, paste0("baseline_selection_", safe_name, ".rds"))
     saveRDS(result, rds_path)
     if (verbose) message("  Saved: ", basename(rds_path))
   }

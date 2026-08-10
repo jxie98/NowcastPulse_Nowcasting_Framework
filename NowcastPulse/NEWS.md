@@ -1,3 +1,17 @@
+# NowcastPulse 0.1.5
+
+## Enhancements
+
+* `np_baseline_selection()`: when `out_dir` is supplied, two new files are
+  now also saved:
+  - `variable_descriptions_<dep_var>.csv` — every column in `dta_trans`,
+    its base variable name with `_lagN`/`_SA` suffixes stripped, and the
+    human-readable description looked up from the `descriptions` column
+    of the index file / raw data files.
+  - `baseline_vars_<dep_var>.R` — the final selected variables formatted
+    as a ready-to-source `baseline_vars <- c(...)` script, for quick reuse
+    when setting up `np_model_*()` calls later.
+
 # NowcastPulse 0.1.4
 
 ## Enhancements
