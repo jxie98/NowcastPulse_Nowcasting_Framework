@@ -282,14 +282,14 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #'   e.g. \code{"im_SA"}.
 #' @param n_ar_lags Integer. Number of AR lags of \code{dep_var} to add.
 #'   Lags 1 through \code{n_ar_lags} plus the seasonal lag implied by
-#'   \code{target_freq} (12 for monthly, 4 for quarterly; omitted for
-#'   annual, where it would duplicate lag 1) are always added.  Defaults to
-#'   \code{4}.
+#'   \code{target_freq} (52 for weekly, 12 for monthly, 4 for quarterly;
+#'   omitted for annual, where it would duplicate lag 1) are always added.
+#'   Defaults to \code{4}.
 #' @param target_freq Character. Frequency of \code{combined}: one of
-#'   \code{"monthly"}, \code{"quarterly"}, \code{"annual"}. Determines the
-#'   number of periods per year used by the \code{"PCHY"} (year-on-year)
-#'   transformation and the seasonal AR lag above. Defaults to
-#'   \code{"monthly"}.
+#'   \code{"monthly"}, \code{"quarterly"}, \code{"annual"}, \code{"weekly"}.
+#'   Determines the number of periods per year used by the \code{"PCHY"}
+#'   (year-on-year) transformation and the seasonal AR lag above. Defaults
+#'   to \code{"monthly"}.
 #' @param out_dir Character. If supplied, the full transformed dataset
 #'   (all candidate variables, AR lags, and date column) is written to
 #'   \code{<out_dir>/transformed_data_<dep_var>.csv}.  Defaults to
@@ -324,20 +324,26 @@ np_transform_data <- function(combined,
                               trans_map,
                               dep_var,
                               n_ar_lags   = 4L,
-                              target_freq = c("monthly", "quarterly", "annual"),
+                              target_freq = c("monthly", "quarterly", "annual", "weekly"),
                               out_dir     = NULL) {
 
   target_freq <- match.arg(target_freq)
   periods_per_year <- switch(target_freq,
-    monthly = 12L, quarterly = 4L, annual = 1L
+    monthly = 12L, quarterly = 4L, annual = 1L, weekly = 52L
   )
 
   if (!dep_var %in% names(combined))
     stop("'", dep_var, "' not found in combined data frame.")
 
-  # Convert date to Date class
+  # Convert date to Date class. "weekly" combined data is already a full
+  # "YYYY-MM-DD" anchor (see np_aggregate_weekly()); other frequencies use
+  # a "YYYY-MM" anchor month, so append the first-of-month day.
   dta <- combined
-  dta$date <- as.Date(paste0(dta$date, "-01"))
+  dta$date <- if (all(nchar(as.character(dta$date)) == 10)) {
+    as.Date(dta$date)
+  } else {
+    as.Date(paste0(dta$date, "-01"))
+  }
 
   # Apply transformations
   value_cols <- setdiff(names(dta), "date")
@@ -849,11 +855,15 @@ strip_variable_suffixes <- function(x) {
 #'   step.  Defaults to \code{4L}.
 #' @param target_freq Character. Frequency of \code{dep_var} and the final
 #'   modelling dataset: one of \code{"monthly"}, \code{"quarterly"},
-#'   \code{"annual"}. Defaults to \code{"monthly"}. When set to
-#'   \code{"quarterly"} or \code{"annual"}, all higher-frequency predictors
-#'   are rolled up to that frequency (see \code{\link{np_aggregate_to_target}}),
-#'   and the year-on-year transform / seasonal AR lag adjust accordingly (see
-#'   \code{\link{np_transform_data}}).
+#'   \code{"annual"}, \code{"weekly"}. Defaults to \code{"monthly"}. When set
+#'   to \code{"quarterly"} or \code{"annual"}, all higher-frequency
+#'   predictors are rolled up to that frequency (see
+#'   \code{\link{np_aggregate_to_target}}), and the year-on-year transform /
+#'   seasonal AR lag adjust accordingly (see \code{\link{np_transform_data}}).
+#'   When set to \code{"weekly"}, daily/daily oil series are aggregated
+#'   \emph{down} to weekly instead (see \code{\link{np_aggregate_weekly}});
+#'   monthly/quarterly/annual source data cannot be split into weeks, so it
+#'   is not used for this target.
 #' @param oos_start Date or character (\code{"YYYY-MM-DD"}). Start of the OOS
 #'   evaluation window for variable selection.
 #' @param oos_end Date or character (\code{"YYYY-MM-DD"}). End of the OOS
@@ -933,7 +943,7 @@ np_baseline_selection <- function(data_dir       = "Data/",
                                   dep_var        = "im_SA",
                                   start_date     = "2000-01",
                                   n_ar_lags      = 4L,
-                                  target_freq    = c("monthly", "quarterly", "annual"),
+                                  target_freq    = c("monthly", "quarterly", "annual", "weekly"),
                                   oos_start,
                                   oos_end,
                                   corr_threshold = 0.4,

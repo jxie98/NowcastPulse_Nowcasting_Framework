@@ -6,6 +6,47 @@ test_that("strip_variable_suffixes() strips trailing _lagN then _SA", {
   )
 })
 
+test_that("np_transform_data supports target_freq = 'weekly'", {
+  n <- 120
+  # combined weekly data uses a full "YYYY-MM-DD" anchor (Sunday-start weeks)
+  dates <- format(seq(as.Date("2020-01-05"), by = "week", length.out = n), "%Y-%m-%d")
+  combined <- data.frame(
+    date  = dates,
+    im_SA = 100 + cumsum(rnorm(n)),
+    stringsAsFactors = FALSE
+  )
+
+  dta_trans <- np_transform_data(
+    combined    = combined,
+    trans_map   = c(im = "PCHY"),
+    dep_var     = "im_SA",
+    n_ar_lags   = 2L,
+    target_freq = "weekly"
+  )
+
+  expect_s3_class(dta_trans$date, "Date")
+  expect_equal(dta_trans$date, as.Date(dates))
+  expect_true(all(c("im_SA_lag1", "im_SA_lag2", "im_SA_lag52") %in% names(dta_trans)))
+})
+
+test_that("np_transform_data still handles 'YYYY-MM' anchors for non-weekly target_freq", {
+  combined <- data.frame(
+    date  = c("2020-01", "2020-02", "2020-03"),
+    im_SA = c(100, 101, 102),
+    stringsAsFactors = FALSE
+  )
+
+  dta_trans <- np_transform_data(
+    combined    = combined,
+    trans_map   = c(im = "PCHY"),
+    dep_var     = "im_SA",
+    n_ar_lags   = 1L,
+    target_freq = "monthly"
+  )
+
+  expect_equal(dta_trans$date, as.Date(c("2020-01-01", "2020-02-01", "2020-03-01")))
+})
+
 test_that("read_variable_descriptions() reads descriptions from data files, Index.csv takes precedence", {
   tmp_dir <- tempfile("npdata_")
   raw_dir <- file.path(tmp_dir, "Raw")

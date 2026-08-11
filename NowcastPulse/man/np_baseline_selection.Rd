@@ -10,7 +10,7 @@ np_baseline_selection(
   dep_var = "im_SA",
   start_date = "2000-01",
   n_ar_lags = 4L,
-  target_freq = c("monthly", "quarterly", "annual"),
+  target_freq = c("monthly", "quarterly", "annual", "weekly"),
   oos_start,
   oos_end,
   corr_threshold = 0.4,
@@ -42,11 +42,15 @@ step.  Defaults to \code{4L}.}
 
 \item{target_freq}{Character. Frequency of \code{dep_var} and the final
 modelling dataset: one of \code{"monthly"}, \code{"quarterly"},
-\code{"annual"}. Defaults to \code{"monthly"}. When set to
-\code{"quarterly"} or \code{"annual"}, all higher-frequency predictors
-are rolled up to that frequency (see \code{\link{np_aggregate_to_target}}),
-and the year-on-year transform / seasonal AR lag adjust accordingly (see
-\code{\link{np_transform_data}}).}
+\code{"annual"}, \code{"weekly"}. Defaults to \code{"monthly"}. When set
+to \code{"quarterly"} or \code{"annual"}, all higher-frequency
+predictors are rolled up to that frequency (see
+\code{\link{np_aggregate_to_target}}), and the year-on-year transform /
+seasonal AR lag adjust accordingly (see \code{\link{np_transform_data}}).
+When set to \code{"weekly"}, daily/daily oil series are aggregated
+\emph{down} to weekly instead (see \code{\link{np_aggregate_weekly}});
+monthly/quarterly/annual source data cannot be split into weeks, so it
+is not used for this target.}
 
 \item{oos_start}{Date or character (\code{"YYYY-MM-DD"}). Start of the OOS
 evaluation window for variable selection.}

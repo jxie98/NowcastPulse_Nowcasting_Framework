@@ -8,7 +8,7 @@ np_process_data(
   data_dir = "Data/",
   prefix = "Fiji",
   start_date = "2000-01",
-  target_freq = c("monthly", "quarterly", "annual"),
+  target_freq = c("monthly", "quarterly", "annual", "weekly"),
   save_outputs = TRUE
 )
 }
@@ -24,12 +24,16 @@ the combined output.  Defaults to \code{"2000-01"}.}
 
 \item{target_freq}{Character. Frequency of the dependent variable / final
 modelling dataset: one of \code{"monthly"}, \code{"quarterly"},
-\code{"annual"}. Defaults to \code{"monthly"}. When set to
-\code{"quarterly"} or \code{"annual"}, all higher-frequency series are
-rolled up to that frequency via \code{\link{np_aggregate_to_target}}
+\code{"annual"}, \code{"weekly"}. Defaults to \code{"monthly"}. When set
+to \code{"quarterly"} or \code{"annual"}, all higher-frequency series
+are rolled up to that frequency via \code{\link{np_aggregate_to_target}}
 (native quarterly source data is merged in rather than dropped; native
 annual source data, from an optional \code{<prefix>_Annual_Data.csv},
-is merged in too when \code{target_freq = "annual"}).}
+is merged in too when \code{target_freq = "annual"}). When set to
+\code{"weekly"}, daily/daily oil series are aggregated \emph{down} to
+weekly instead (via \code{\link{np_aggregate_weekly}}) and merged with
+the native weekly series; monthly/quarterly/annual source data cannot
+be split into weeks, so it is not used for this target.}
 
 \item{save_outputs}{Logical. If \code{TRUE} (the default), all processed
 data frames are written as CSV files to \code{data_dir/Processed/}.}
@@ -40,7 +44,10 @@ Invisibly, a named list with elements:
   \item{\code{sa}}{List of seasonally adjusted data frames by frequency
     (\code{daily}, \code{daily_oil}, \code{weekly}, \code{monthly},
     \code{quarterly}, \code{annual}).}
-  \item{\code{monthly}}{List of monthly-aggregated SA data frames.}
+  \item{\code{monthly}}{List of data frames aggregated to the frequency
+    used to build \code{combined} — monthly for \code{target_freq}
+    \code{"monthly"}/\code{"quarterly"}/\code{"annual"}, or weekly (see
+    \code{\link{np_aggregate_weekly}}) for \code{target_freq = "weekly"}.}
   \item{\code{combined}}{Single combined data frame, at \code{target_freq},
     ready for variable selection and modelling.}
   \item{\code{target_freq}}{The frequency \code{combined} is at.}
@@ -60,6 +67,10 @@ head(result$combined)
 # Quarterly dependent variable (e.g. quarterly GDP):
 result_q <- np_process_data(data_dir = "Data/", prefix = "Fiji",
                             target_freq = "quarterly")
+
+# Weekly dependent variable (daily/weekly source data only):
+result_w <- np_process_data(data_dir = "Data/", prefix = "Fiji",
+                            target_freq = "weekly")
 }
 
 }

@@ -155,6 +155,22 @@ aggregate_to_monthly_internal <- function(df, dataset_type, agg_map = NULL) {
 }
 
 
+# ---- Internal helper: week-start (Sunday on/before) anchor date -----------
+#' @noRd
+week_start <- function(dates) {
+  dates - (as.integer(format(dates, "%u")) %% 7L)
+}
+
+
+# ---- Internal helper: aggregate_to_weekly_internal -------------
+#' @noRd
+aggregate_to_weekly_internal <- function(df, dataset_type, agg_map = NULL) {
+  dt       <- parse_date_by_type(df$date, dataset_type)
+  week_key <- format(week_start(dt), "%Y-%m-%d")
+  aggregate_df_by_period(df, week_key, agg_map)
+}
+
+
 # ---- Internal helper: apply_x13 -------------------------------
 #' @noRd
 apply_x13 <- function(df, dataset_type, freq, dataset_label, sa_map = NULL) {
@@ -295,6 +311,66 @@ np_aggregate_monthly <- function(sa_data, agg_map = NULL) {
     daily_oil = maybe_agg(sa_data$daily_oil, "daily_oil"),
     weekly    = maybe_agg(sa_data$weekly,    "weekly"),
     monthly   = monthly_sa_m
+  )
+}
+
+
+# ---- Exported function: np_aggregate_weekly -------------------
+
+#' Aggregate seasonally adjusted series to weekly frequency
+#'
+#' Converts daily and daily oil SA data frames from
+#' \code{\link{np_seasonal_adjust}} to weekly frequency using the
+#' per-variable aggregation rules in \code{agg_map} (\code{"Sum"},
+#' \code{"Average"}, or \code{"Last"}). Each week is anchored to the Sunday
+#' on/before its dates (so \code{date} is always a Sunday), and the native
+#' weekly SA data frame is re-anchored the same way so all frequencies line
+#' up on a common weekly grid.
+#'
+#' This mirrors \code{\link{np_aggregate_monthly}}, but for a
+#' \code{target_freq = "weekly"} pipeline where daily/weekly are the only
+#' source frequencies available (monthly/quarterly/annual source data
+#' cannot be split into weeks, so they are not part of this aggregation).
+#'
+#' @param sa_data Named list as returned by \code{\link{np_seasonal_adjust}}.
+#' @param agg_map Named character vector mapping variable names to aggregation
+#'   methods.  Typically \code{raw_data$agg_map}.  Defaults to
+#'   \code{"Average"} for any variable not found in the map.
+#'
+#' @return A named list with elements \code{daily}, \code{daily_oil},
+#'   \code{weekly} — each a weekly-frequency data frame with \code{date}
+#'   anchored to the Sunday starting that week.
+#'
+#' @examples
+#' \dontrun{
+#' raw    <- np_load_data(data_dir = "Data/", prefix = "Fiji")
+#' sa     <- np_seasonal_adjust(raw)
+#' weekly <- np_aggregate_weekly(sa, agg_map = raw$agg_map)
+#' head(weekly$daily)
+#' }
+#'
+#' @export
+np_aggregate_weekly <- function(sa_data, agg_map = NULL) {
+
+  message("Aggregating SA series to weekly frequency ...")
+
+  # Re-anchor native weekly data to the same Sunday-start grid; skip if
+  # weekly was not loaded
+  weekly_sa_w <- if (!is.null(sa_data$weekly)) {
+    w      <- sa_data$weekly
+    w_dates <- parse_date_by_type(w$date, "weekly")
+    w$date  <- format(week_start(w_dates), "%Y-%m-%d")
+    w
+  } else NULL
+
+  # Skip NULL datasets (file was missing)
+  maybe_agg <- function(df, type)
+    if (!is.null(df)) aggregate_to_weekly_internal(df, type, agg_map) else NULL
+
+  list(
+    daily     = maybe_agg(sa_data$daily,     "daily"),
+    daily_oil = maybe_agg(sa_data$daily_oil, "daily_oil"),
+    weekly    = weekly_sa_w
   )
 }
 
@@ -552,12 +628,16 @@ np_aggregate_to_target <- function(combined,
 #'   the combined output.  Defaults to \code{"2000-01"}.
 #' @param target_freq Character. Frequency of the dependent variable / final
 #'   modelling dataset: one of \code{"monthly"}, \code{"quarterly"},
-#'   \code{"annual"}. Defaults to \code{"monthly"}. When set to
-#'   \code{"quarterly"} or \code{"annual"}, all higher-frequency series are
-#'   rolled up to that frequency via \code{\link{np_aggregate_to_target}}
+#'   \code{"annual"}, \code{"weekly"}. Defaults to \code{"monthly"}. When set
+#'   to \code{"quarterly"} or \code{"annual"}, all higher-frequency series
+#'   are rolled up to that frequency via \code{\link{np_aggregate_to_target}}
 #'   (native quarterly source data is merged in rather than dropped; native
 #'   annual source data, from an optional \code{<prefix>_Annual_Data.csv},
-#'   is merged in too when \code{target_freq = "annual"}).
+#'   is merged in too when \code{target_freq = "annual"}). When set to
+#'   \code{"weekly"}, daily/daily oil series are aggregated \emph{down} to
+#'   weekly instead (via \code{\link{np_aggregate_weekly}}) and merged with
+#'   the native weekly series; monthly/quarterly/annual source data cannot
+#'   be split into weeks, so it is not used for this target.
 #' @param save_outputs Logical. If \code{TRUE} (the default), all processed
 #'   data frames are written as CSV files to \code{data_dir/Processed/}.
 #'
@@ -566,7 +646,10 @@ np_aggregate_to_target <- function(combined,
 #'   \item{\code{sa}}{List of seasonally adjusted data frames by frequency
 #'     (\code{daily}, \code{daily_oil}, \code{weekly}, \code{monthly},
 #'     \code{quarterly}, \code{annual}).}
-#'   \item{\code{monthly}}{List of monthly-aggregated SA data frames.}
+#'   \item{\code{monthly}}{List of data frames aggregated to the frequency
+#'     used to build \code{combined} — monthly for \code{target_freq}
+#'     \code{"monthly"}/\code{"quarterly"}/\code{"annual"}, or weekly (see
+#'     \code{\link{np_aggregate_weekly}}) for \code{target_freq = "weekly"}.}
 #'   \item{\code{combined}}{Single combined data frame, at \code{target_freq},
 #'     ready for variable selection and modelling.}
 #'   \item{\code{target_freq}}{The frequency \code{combined} is at.}
@@ -580,13 +663,17 @@ np_aggregate_to_target <- function(combined,
 #' # Quarterly dependent variable (e.g. quarterly GDP):
 #' result_q <- np_process_data(data_dir = "Data/", prefix = "Fiji",
 #'                             target_freq = "quarterly")
+#'
+#' # Weekly dependent variable (daily/weekly source data only):
+#' result_w <- np_process_data(data_dir = "Data/", prefix = "Fiji",
+#'                             target_freq = "weekly")
 #' }
 #'
 #' @export
 np_process_data <- function(data_dir    = "Data/",
                             prefix      = "Fiji",
                             start_date  = "2000-01",
-                            target_freq = c("monthly", "quarterly", "annual"),
+                            target_freq = c("monthly", "quarterly", "annual", "weekly"),
                             save_outputs = TRUE) {
 
   target_freq <- match.arg(target_freq)
@@ -599,17 +686,25 @@ np_process_data <- function(data_dir    = "Data/",
   message("Step 2/4: Seasonal adjustment (X-13) ...")
   sa  <- np_seasonal_adjust(raw, sa_map = raw$sa_map)
 
-  message("Step 3/4: Aggregating to monthly ...")
-  monthly_list <- np_aggregate_monthly(sa, agg_map = raw$agg_map)
+  if (target_freq == "weekly") {
+    message("Step 3/4: Aggregating to weekly ...")
+    monthly_list <- np_aggregate_weekly(sa, agg_map = raw$agg_map)
 
-  message("Step 4/4: Merging into combined monthly dataset ...")
-  combined <- np_merge_monthly(monthly_list, start_date = start_date)
+    message("Step 4/4: Merging into combined weekly dataset ...")
+    combined <- np_merge_monthly(monthly_list, start_date = start_date)
+  } else {
+    message("Step 3/4: Aggregating to monthly ...")
+    monthly_list <- np_aggregate_monthly(sa, agg_map = raw$agg_map)
 
-  if (target_freq != "monthly") {
-    combined <- np_aggregate_to_target(
-      combined, target_freq = target_freq,
-      agg_map = raw$agg_map, quarterly_sa = sa$quarterly, annual_sa = sa$annual
-    )
+    message("Step 4/4: Merging into combined monthly dataset ...")
+    combined <- np_merge_monthly(monthly_list, start_date = start_date)
+
+    if (target_freq != "monthly") {
+      combined <- np_aggregate_to_target(
+        combined, target_freq = target_freq,
+        agg_map = raw$agg_map, quarterly_sa = sa$quarterly, annual_sa = sa$annual
+      )
+    }
   }
 
   if (save_outputs) {
@@ -634,7 +729,7 @@ np_process_data <- function(data_dir    = "Data/",
     save_if_present(sa$annual,    paste0(prefix, "_Annual_Data_SA.csv"))
 
     freq_label <- switch(target_freq,
-      monthly = "Monthly", quarterly = "Quarterly", annual = "Annual"
+      monthly = "Monthly", quarterly = "Quarterly", annual = "Annual", weekly = "Weekly"
     )
     combined_filename <- paste0(prefix, "_Combined_", freq_label, "_SA.csv")
     write.csv(combined, file.path(proc_dir, combined_filename), row.names = FALSE)

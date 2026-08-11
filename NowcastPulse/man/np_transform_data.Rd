@@ -9,7 +9,7 @@ np_transform_data(
   trans_map,
   dep_var,
   n_ar_lags = 4L,
-  target_freq = c("monthly", "quarterly", "annual"),
+  target_freq = c("monthly", "quarterly", "annual", "weekly"),
   out_dir = NULL
 )
 }
@@ -30,15 +30,15 @@ e.g. \code{"im_SA"}.}
 
 \item{n_ar_lags}{Integer. Number of AR lags of \code{dep_var} to add.
 Lags 1 through \code{n_ar_lags} plus the seasonal lag implied by
-\code{target_freq} (12 for monthly, 4 for quarterly; omitted for
-annual, where it would duplicate lag 1) are always added.  Defaults to
-\code{4}.}
+\code{target_freq} (52 for weekly, 12 for monthly, 4 for quarterly;
+omitted for annual, where it would duplicate lag 1) are always added.
+Defaults to \code{4}.}
 
 \item{target_freq}{Character. Frequency of \code{combined}: one of
-\code{"monthly"}, \code{"quarterly"}, \code{"annual"}. Determines the
-number of periods per year used by the \code{"PCHY"} (year-on-year)
-transformation and the seasonal AR lag above. Defaults to
-\code{"monthly"}.}
+\code{"monthly"}, \code{"quarterly"}, \code{"annual"}, \code{"weekly"}.
+Determines the number of periods per year used by the \code{"PCHY"}
+(year-on-year) transformation and the seasonal AR lag above. Defaults
+to \code{"monthly"}.}
 
 \item{out_dir}{Character. If supplied, the full transformed dataset
 (all candidate variables, AR lags, and date column) is written to

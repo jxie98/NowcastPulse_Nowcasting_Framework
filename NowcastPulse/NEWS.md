@@ -1,3 +1,26 @@
+# NowcastPulse 0.1.8
+
+## Enhancements
+
+* Added "weekly" as a valid `target_freq` for nowcasting a native weekly
+  dependent variable, alongside the existing `"monthly"`, `"quarterly"`,
+  `"annual"`. Since weekly is *finer* than monthly, it works differently
+  from quarterly/annual: instead of rolling the monthly combined dataset
+  *up*, daily/daily oil series are aggregated *down* to weekly and merged
+  with the native weekly series (monthly/quarterly/annual source data
+  can't be split into weeks, so it isn't used for this target).
+  - New `np_aggregate_weekly()`, mirroring `np_aggregate_monthly()`: each
+    week is anchored to the Sunday on/before its dates, so all frequencies
+    line up on a common weekly grid.
+  - `np_process_data(..., target_freq = "weekly")` routes through the new
+    weekly aggregation instead of the monthly one.
+  - `np_transform_data(..., target_freq = "weekly")` uses 52 periods per
+    year (year-on-year transform and seasonal AR lag), and now handles
+    both the `"YYYY-MM"` (monthly/quarterly/annual) and `"YYYY-MM-DD"`
+    (weekly) `combined$date` anchor formats.
+  - `np_baseline_selection(..., target_freq = "weekly")` threads through
+    end-to-end.
+
 # NowcastPulse 0.1.7
 
 ## Enhancements
