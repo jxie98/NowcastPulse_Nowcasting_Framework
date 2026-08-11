@@ -57,15 +57,18 @@ A data frame with:
 }
 }
 \description{
-Applies per-variable transformations (log-difference, first-difference, or
-year-on-year growth rate) to the combined monthly SA dataset, then appends
-AR lags of the dependent variable and optional structural dummy columns.
+Applies per-variable transformations (log-difference, log level,
+first-difference, or year-on-year growth rate) to the combined monthly SA
+dataset, then appends AR lags of the dependent variable and optional
+structural dummy columns.
 }
 \details{
 The transformation for each variable is read from \code{trans_map}:
 \itemize{
   \item \code{"DLOG"} or \code{"DLOG(...)"} — log-difference
     \eqn{\Delta\ln x_t}
+  \item \code{"LOG"} or \code{"LOG(...)"} — log level \eqn{\ln x_t}
+    (no differencing)
   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
   \item \code{"PCHY"} — year-on-year growth rate
     \eqn{x_t / x_{t-12} - 1}

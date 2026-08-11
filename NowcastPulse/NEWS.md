@@ -1,3 +1,13 @@
+# NowcastPulse 0.1.9
+
+## Enhancements
+
+* Added a `"LOG"` / `"LOG(...)"` transformation code for `trans_index` /
+  `trans_map`, applied by `np_transform_data()` (and therefore
+  `np_baseline_selection()`). It takes the plain log level `ln(x_t)` of a
+  variable, with no differencing — distinct from the existing `"DLOG"`
+  (log-difference).
+
 # NowcastPulse 0.1.8
 
 ## Enhancements

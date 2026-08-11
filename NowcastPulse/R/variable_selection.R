@@ -77,6 +77,9 @@ make_reg_html <- function(model, title = "Bridge Model", dep_label = NULL) {
 dlog <- function(x) c(NA_real_, diff(log(as.numeric(x))))
 
 #' @noRd
+log_level <- function(x) log(as.numeric(x))
+
+#' @noRd
 dfirst <- function(x) c(NA_real_, diff(as.numeric(x)))
 
 #' @noRd
@@ -93,6 +96,7 @@ apply_trans <- function(x, trans, n_periods = 12L) {
   if (grepl("^none$",  trans, ignore.case = TRUE)) return(as.numeric(x))
   if (grepl("^PCHY",   trans, ignore.case = TRUE)) return(pchy(x, n_periods))
   if (grepl("^DLOG",   trans, ignore.case = TRUE)) return(dlog(x))
+  if (grepl("^LOG",    trans, ignore.case = TRUE)) return(log_level(x))
   if (grepl("^D\\(",   trans, ignore.case = TRUE)) return(dfirst(x))
   pchy(x, n_periods)   # default fallback
 }
@@ -254,14 +258,17 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 
 #' Transform monthly data and add AR lags and structural dummies
 #'
-#' Applies per-variable transformations (log-difference, first-difference, or
-#' year-on-year growth rate) to the combined monthly SA dataset, then appends
-#' AR lags of the dependent variable and optional structural dummy columns.
+#' Applies per-variable transformations (log-difference, log level,
+#' first-difference, or year-on-year growth rate) to the combined monthly SA
+#' dataset, then appends AR lags of the dependent variable and optional
+#' structural dummy columns.
 #'
 #' The transformation for each variable is read from \code{trans_map}:
 #' \itemize{
 #'   \item \code{"DLOG"} or \code{"DLOG(...)"} — log-difference
 #'     \eqn{\Delta\ln x_t}
+#'   \item \code{"LOG"} or \code{"LOG(...)"} — log level \eqn{\ln x_t}
+#'     (no differencing)
 #'   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
 #'   \item \code{"PCHY"} — year-on-year growth rate
 #'     \eqn{x_t / x_{t-12} - 1}

@@ -27,8 +27,8 @@ A named list with elements:
   \item{\code{sa_map}}{Named character vector mapping variable names to SA
     flags (\code{"NSA"} or otherwise).}
   \item{\code{trans_map}}{Named character vector mapping variable names to
-    transformation codes (\code{"DLOG"}, \code{"D(...)"}, \code{"PCHY"},
-    \code{"none"}).}
+    transformation codes (\code{"DLOG"}, \code{"LOG"}, \code{"D(...)"},
+    \code{"PCHY"}, \code{"none"}).}
 }
 }
 \description{

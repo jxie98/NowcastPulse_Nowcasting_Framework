@@ -6,6 +6,34 @@ test_that("strip_variable_suffixes() strips trailing _lagN then _SA", {
   )
 })
 
+test_that("apply_trans('LOG') returns the log level, distinct from 'DLOG'", {
+  x <- c(1, 2.718281828, 20.0855369)
+
+  expect_equal(apply_trans(x, "LOG"), log(x))
+  expect_equal(apply_trans(x, "log()"), log(x))
+  # DLOG must still take priority over LOG (both start differently, but
+  # guard against the "LOG" pattern accidentally matching "DLOG(...)")
+  expect_equal(apply_trans(x, "DLOG(x)"), dlog(x))
+})
+
+test_that("np_transform_data applies trans_index = 'LOG' as a plain log level", {
+  combined <- data.frame(
+    date  = c("2020-01", "2020-02", "2020-03"),
+    x_SA  = c(10, 20, 40),
+    stringsAsFactors = FALSE
+  )
+
+  dta_trans <- np_transform_data(
+    combined    = combined,
+    trans_map   = c(x = "LOG"),
+    dep_var     = "x_SA",
+    n_ar_lags   = 1L,
+    target_freq = "monthly"
+  )
+
+  expect_equal(dta_trans$x_SA, log(c(10, 20, 40)))
+})
+
 test_that("np_transform_data supports target_freq = 'weekly'", {
   n <- 120
   # combined weekly data uses a full "YYYY-MM-DD" anchor (Sunday-start weeks)
