@@ -158,7 +158,7 @@ parse_flexible_dates <- function(x, dataset_type, date_format = "auto") {
 
   if (any(unresolved))
     stop("Could not parse date label(s) for dataset_type = '", dataset_type, "': ",
-         paste(unique(x[unresolved]), collapse = ", "),
+         paste(sprintf("'%s'", unique(x[unresolved])), collapse = ", "),
          "\nPass an explicit `date_format` (a strptime format string, e.g. \"%d.%m.%Y\", ",
          "or the literal \"excel_serial\").")
 
@@ -271,7 +271,40 @@ np_convert_raw_data <- function(input_file,
     stop("input_file has ", ncol(df), " column(s) but date_col_start = ",
          date_col_start, " — expected variable_names, descriptions, then dates.")
 
-  date_headers <- names(df)[date_col_start:ncol(df)]
+  id_cols    <- df[, seq_len(date_col_start - 1), drop = FALSE]
+  value_cols <- df[, date_col_start:ncol(df), drop = FALSE]
+  date_headers <- names(value_cols)
+
+  # Blank/missing column headers are a common trailing artifact of
+  # spreadsheet exports (formatting extended past the real data range).
+  # read.csv() uniquifies repeated blank headers into "", ".1", ".2", ...
+  # (via make.unique(), independent of check.names), so treat those as
+  # blank too. Drop them only if they carry no data; if a blank-header
+  # column does have data, its date is genuinely unrecoverable and we
+  # must stop.
+  blank_idx <- which(is.na(date_headers) | trimws(date_headers) == "" |
+                      grepl("^\\.[0-9]+$", trimws(date_headers)))
+  if (length(blank_idx) > 0) {
+    has_data <- vapply(blank_idx, function(i) {
+      v <- value_cols[[i]]
+      any(!is.na(v) & trimws(as.character(v)) != "")
+    }, logical(1))
+
+    bad_idx <- blank_idx[has_data]
+    if (length(bad_idx) > 0)
+      stop("Column(s) at position(s) ", paste(date_col_start - 1L + bad_idx, collapse = ", "),
+           " have a blank/missing header but contain data — cannot infer their date label. ",
+           "Fix the header in the source file, or check date_col_start.")
+
+    drop_idx <- blank_idx[!has_data]
+    message(length(drop_idx), " blank-header column(s) with no data dropped (trailing ",
+            "artifact from the source export): position(s) ",
+            paste(date_col_start - 1L + drop_idx, collapse = ", "))
+    keep <- setdiff(seq_along(date_headers), drop_idx)
+    date_headers <- date_headers[keep]
+    value_cols   <- value_cols[, keep, drop = FALSE]
+  }
+
   parsed_dates <- parse_flexible_dates(date_headers, dataset_type, date_format)
 
   new_headers <- format_date_header(parsed_dates, dataset_type)
@@ -285,7 +318,7 @@ np_convert_raw_data <- function(input_file,
 
   # Order columns chronologically; keep variable_names / descriptions first
   ord <- order(parsed_dates)
-  df  <- df[, c(seq_len(date_col_start - 1), (date_col_start:ncol(df))[ord]), drop = FALSE]
+  df  <- cbind(id_cols, value_cols[, ord, drop = FALSE])
   names(df) <- c("variable_names", "descriptions", new_headers[ord])
 
   file_map <- c(
