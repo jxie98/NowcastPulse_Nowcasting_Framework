@@ -58,9 +58,9 @@ A data frame with:
 }
 \description{
 Applies per-variable transformations (log-difference, log level,
-first-difference, or year-on-year growth rate) to the combined monthly SA
-dataset, then appends AR lags of the dependent variable and optional
-structural dummy columns.
+first-difference, year-on-year growth rate, or annualised quarterly
+growth rate) to the combined monthly SA dataset, then appends AR lags of
+the dependent variable and optional structural dummy columns.
 }
 \details{
 The transformation for each variable is read from \code{trans_map}:
@@ -72,6 +72,13 @@ The transformation for each variable is read from \code{trans_map}:
   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
   \item \code{"PCHY"} — year-on-year growth rate
     \eqn{x_t / x_{t-12} - 1}
+  \item \code{"SAAR"} or \code{"SAAR(...)"} — annualised quarterly growth
+    rate, percent: \eqn{(\exp(4 \cdot \Delta\ln x_t) - 1) \times 100},
+    the standard seasonally-adjusted-annualised-rate convention (what the
+    annual growth rate would be if this quarter's log-growth persisted
+    for 4 quarters). Intended for quarterly level series (e.g. real GDP);
+    applying it to data at other frequencies still computes the formula
+    literally on whatever period-to-period log-difference the series has.
   \item \code{"none"} — no transformation
   \item anything else / missing — defaults to \code{"PCHY"}
 }

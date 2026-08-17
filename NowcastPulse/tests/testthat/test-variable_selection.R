@@ -16,6 +16,22 @@ test_that("apply_trans('LOG') returns the log level, distinct from 'DLOG'", {
   expect_equal(apply_trans(x, "DLOG(x)"), dlog(x))
 })
 
+test_that("apply_trans('SAAR') annualises the quarterly log-difference into a percent rate", {
+  x <- c(100, 101, 102.5, 101.8, 103.2)
+
+  d        <- c(NA_real_, diff(log(x)))
+  expected <- (exp(4 * d) - 1) * 100
+
+  expect_equal(apply_trans(x, "SAAR"), expected)
+  expect_equal(apply_trans(x, "saar()"), expected)
+
+  # Sanity check against a hand-computed value: 1% quarterly growth should
+  # annualise to a bit over 4%, not exactly 4% (compounding).
+  q <- c(100, 101)
+  expect_equal(apply_trans(q, "SAAR")[2], (exp(4 * log(1.01)) - 1) * 100)
+  expect_gt(apply_trans(q, "SAAR")[2], 4)
+})
+
 test_that("np_transform_data applies trans_index = 'LOG' as a plain log level", {
   combined <- data.frame(
     date  = c("2020-01", "2020-02", "2020-03"),

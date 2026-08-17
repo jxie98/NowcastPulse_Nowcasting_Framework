@@ -91,10 +91,14 @@ pchy <- function(x, n_periods = 12L) {
 }
 
 #' @noRd
+saar <- function(x) (exp(4 * dlog(x)) - 1) * 100
+
+#' @noRd
 apply_trans <- function(x, trans, n_periods = 12L) {
   trans <- trimws(trans)
   if (grepl("^none$",  trans, ignore.case = TRUE)) return(as.numeric(x))
   if (grepl("^PCHY",   trans, ignore.case = TRUE)) return(pchy(x, n_periods))
+  if (grepl("^SAAR",   trans, ignore.case = TRUE)) return(saar(x))
   if (grepl("^DLOG",   trans, ignore.case = TRUE)) return(dlog(x))
   if (grepl("^LOG",    trans, ignore.case = TRUE)) return(log_level(x))
   if (grepl("^D\\(",   trans, ignore.case = TRUE)) return(dfirst(x))
@@ -259,9 +263,9 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #' Transform monthly data and add AR lags and structural dummies
 #'
 #' Applies per-variable transformations (log-difference, log level,
-#' first-difference, or year-on-year growth rate) to the combined monthly SA
-#' dataset, then appends AR lags of the dependent variable and optional
-#' structural dummy columns.
+#' first-difference, year-on-year growth rate, or annualised quarterly
+#' growth rate) to the combined monthly SA dataset, then appends AR lags of
+#' the dependent variable and optional structural dummy columns.
 #'
 #' The transformation for each variable is read from \code{trans_map}:
 #' \itemize{
@@ -272,6 +276,13 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #'   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
 #'   \item \code{"PCHY"} — year-on-year growth rate
 #'     \eqn{x_t / x_{t-12} - 1}
+#'   \item \code{"SAAR"} or \code{"SAAR(...)"} — annualised quarterly growth
+#'     rate, percent: \eqn{(\exp(4 \cdot \Delta\ln x_t) - 1) \times 100},
+#'     the standard seasonally-adjusted-annualised-rate convention (what the
+#'     annual growth rate would be if this quarter's log-growth persisted
+#'     for 4 quarters). Intended for quarterly level series (e.g. real GDP);
+#'     applying it to data at other frequencies still computes the formula
+#'     literally on whatever period-to-period log-difference the series has.
 #'   \item \code{"none"} — no transformation
 #'   \item anything else / missing — defaults to \code{"PCHY"}
 #' }
