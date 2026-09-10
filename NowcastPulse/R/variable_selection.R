@@ -91,6 +91,14 @@ pchy <- function(x, n_periods = 12L) {
 }
 
 #' @noRd
+dify <- function(x, n_periods = 12L) {
+  x <- as.numeric(x)
+  n <- length(x)
+  if (n <= n_periods) return(rep(NA_real_, n))
+  c(rep(NA_real_, n_periods), x[(n_periods + 1):n] - x[1:(n - n_periods)])
+}
+
+#' @noRd
 saar <- function(x) (exp(4 * dlog(x)) - 1) * 100
 
 #' @noRd
@@ -98,6 +106,7 @@ apply_trans <- function(x, trans, n_periods = 12L) {
   trans <- trimws(trans)
   if (grepl("^none$",  trans, ignore.case = TRUE)) return(as.numeric(x))
   if (grepl("^PCHY",   trans, ignore.case = TRUE)) return(pchy(x, n_periods))
+  if (grepl("^DIFY",   trans, ignore.case = TRUE)) return(dify(x, n_periods))
   if (grepl("^SAAR",   trans, ignore.case = TRUE)) return(saar(x))
   if (grepl("^DLOG",   trans, ignore.case = TRUE)) return(dlog(x))
   if (grepl("^LOG",    trans, ignore.case = TRUE)) return(log_level(x))
@@ -263,9 +272,10 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #' Transform monthly data and add AR lags and structural dummies
 #'
 #' Applies per-variable transformations (log-difference, log level,
-#' first-difference, year-on-year growth rate, or annualised quarterly
-#' growth rate) to the combined monthly SA dataset, then appends AR lags of
-#' the dependent variable and optional structural dummy columns.
+#' first-difference, year-on-year growth rate, year-on-year difference, or
+#' annualised quarterly growth rate) to the combined monthly SA dataset,
+#' then appends AR lags of the dependent variable and optional structural
+#' dummy columns.
 #'
 #' The transformation for each variable is read from \code{trans_map}:
 #' \itemize{
@@ -276,6 +286,8 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #'   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
 #'   \item \code{"PCHY"} — year-on-year growth rate
 #'     \eqn{x_t / x_{t-12} - 1}
+#'   \item \code{"DIFY"} — year-on-year (seasonal) difference
+#'     \eqn{x_t - x_{t-12}}
 #'   \item \code{"SAAR"} or \code{"SAAR(...)"} — annualised quarterly growth
 #'     rate, percent: \eqn{(\exp(4 \cdot \Delta\ln x_t) - 1) \times 100},
 #'     the standard seasonally-adjusted-annualised-rate convention (what the
@@ -306,8 +318,9 @@ run_stepwise_oos_mae <- function(candidates, bridge_full, eval_months,
 #' @param target_freq Character. Frequency of \code{combined}: one of
 #'   \code{"monthly"}, \code{"quarterly"}, \code{"annual"}, \code{"weekly"}.
 #'   Determines the number of periods per year used by the \code{"PCHY"}
-#'   (year-on-year) transformation and the seasonal AR lag above. Defaults
-#'   to \code{"monthly"}.
+#'   (year-on-year) and \code{"DIFY"} (year-on-year difference)
+#'   transformations and the seasonal AR lag above. Defaults to
+#'   \code{"monthly"}.
 #' @param out_dir Character. If supplied, the full transformed dataset
 #'   (all candidate variables, AR lags, and date column) is written to
 #'   \code{<out_dir>/transformed_data_<dep_var>.csv}.  Defaults to

@@ -32,6 +32,18 @@ test_that("apply_trans('SAAR') annualises the quarterly log-difference into a pe
   expect_gt(apply_trans(q, "SAAR")[2], 4)
 })
 
+test_that("apply_trans('DIFY') returns the year-on-year (seasonal) difference", {
+  x <- c(1:24)
+
+  expected <- c(rep(NA_real_, 12), x[13:24] - x[1:12])
+  expect_equal(apply_trans(x, "DIFY", n_periods = 12L), expected)
+  expect_equal(apply_trans(x, "dify()", n_periods = 12L), expected)
+
+  # DIFY must not be shadowed by the "D(" first-difference pattern.
+  expect_false(isTRUE(all.equal(apply_trans(x, "DIFY", n_periods = 12L),
+                                 apply_trans(x, "D(x)"))))
+})
+
 test_that("np_transform_data applies trans_index = 'LOG' as a plain log level", {
   combined <- data.frame(
     date  = c("2020-01", "2020-02", "2020-03"),

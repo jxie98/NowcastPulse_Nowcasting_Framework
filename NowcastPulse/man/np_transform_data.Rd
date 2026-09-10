@@ -37,8 +37,9 @@ Defaults to \code{4}.}
 \item{target_freq}{Character. Frequency of \code{combined}: one of
 \code{"monthly"}, \code{"quarterly"}, \code{"annual"}, \code{"weekly"}.
 Determines the number of periods per year used by the \code{"PCHY"}
-(year-on-year) transformation and the seasonal AR lag above. Defaults
-to \code{"monthly"}.}
+(year-on-year) and \code{"DIFY"} (year-on-year difference)
+transformations and the seasonal AR lag above. Defaults to
+\code{"monthly"}.}
 
 \item{out_dir}{Character. If supplied, the full transformed dataset
 (all candidate variables, AR lags, and date column) is written to
@@ -58,9 +59,10 @@ A data frame with:
 }
 \description{
 Applies per-variable transformations (log-difference, log level,
-first-difference, year-on-year growth rate, or annualised quarterly
-growth rate) to the combined monthly SA dataset, then appends AR lags of
-the dependent variable and optional structural dummy columns.
+first-difference, year-on-year growth rate, year-on-year difference, or
+annualised quarterly growth rate) to the combined monthly SA dataset,
+then appends AR lags of the dependent variable and optional structural
+dummy columns.
 }
 \details{
 The transformation for each variable is read from \code{trans_map}:
@@ -72,6 +74,8 @@ The transformation for each variable is read from \code{trans_map}:
   \item \code{"D(...)"} — first difference \eqn{\Delta x_t}
   \item \code{"PCHY"} — year-on-year growth rate
     \eqn{x_t / x_{t-12} - 1}
+  \item \code{"DIFY"} — year-on-year (seasonal) difference
+    \eqn{x_t - x_{t-12}}
   \item \code{"SAAR"} or \code{"SAAR(...)"} — annualised quarterly growth
     rate, percent: \eqn{(\exp(4 \cdot \Delta\ln x_t) - 1) \times 100},
     the standard seasonally-adjusted-annualised-rate convention (what the

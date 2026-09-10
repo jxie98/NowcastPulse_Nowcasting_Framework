@@ -1,3 +1,14 @@
+# NowcastPulse 0.1.10
+
+## Enhancements
+
+* Added a `"DIFY"` transformation code for `trans_index` / `trans_map`,
+  applied by `np_transform_data()` (and therefore
+  `np_baseline_selection()`). It computes the year-on-year (seasonal)
+  difference `x_t - x_{t-n}` (n = periods per year for the given
+  `target_freq`) — distinct from the existing `"PCHY"` (year-on-year
+  growth rate) and `"D(...)"` (period-on-period difference).
+
 # NowcastPulse 0.1.9
 
 ## Enhancements
